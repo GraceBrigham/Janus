@@ -90,6 +90,8 @@ Interactive commands:
 
 `run_harness` is the evaluation entrypoint. It expands selected scenarios, subscenarios, permission assistants, responder modes, risk tolerances, and repetitions into concrete runs.
 
+With `openai/o3-mini`, each individual harness run cost under $0.10 in our testing.
+
 Each run gets:
 
 - a unique `run_id`
