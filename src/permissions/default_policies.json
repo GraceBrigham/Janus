@@ -1,0 +1,229 @@
+{
+  "policies": [
+    {
+      "id": "email-list",
+      "name": "Allow Email List",
+      "description": "Allow listing emails",
+      "tool_name": "email",
+      "action": "list",
+      "effect": "PERMIT",
+      "conditions": [
+        {
+          "attribute": "subject.type",
+          "operator": "==",
+          "value": "agent"
+        }
+      ]
+    },
+    {
+      "id": "email-search",
+      "name": "Allow Email Search",
+      "description": "Allow searching emails by sender",
+      "tool_name": "email",
+      "action": "search",
+      "effect": "PERMIT",
+      "conditions": [
+        {
+          "attribute": "subject.type",
+          "operator": "==",
+          "value": "agent"
+        }
+      ]
+    },
+    {
+      "id": "email-get",
+      "name": "Allow Email Get",
+      "description": "Allow fetching a specific email",
+      "tool_name": "email",
+      "action": "get",
+      "effect": "PERMIT",
+      "conditions": [
+        {
+          "attribute": "subject.type",
+          "operator": "==",
+          "value": "agent"
+        }
+      ]
+    },
+    {
+      "id": "email-send",
+      "name": "Allow Email Send",
+      "description": "Allow sending emails",
+      "tool_name": "email",
+      "action": "send",
+      "effect": "PERMIT",
+      "conditions": [
+        {
+          "attribute": "subject.type",
+          "operator": "==",
+          "value": "agent"
+        }
+      ]
+    },
+    {
+      "id": "email-delete",
+      "name": "Allow Email Delete",
+      "description": "Allow deleting emails",
+      "tool_name": "email",
+      "action": "delete",
+      "effect": "PERMIT",
+      "conditions": [
+        {
+          "attribute": "subject.type",
+          "operator": "==",
+          "value": "agent"
+        }
+      ]
+    },
+    {
+      "id": "calendar-list",
+      "name": "Allow Calendar List",
+      "description": "Allow listing calendar events",
+      "tool_name": "calendar",
+      "action": "list",
+      "effect": "PERMIT",
+      "conditions": [
+        {
+          "attribute": "subject.type",
+          "operator": "==",
+          "value": "agent"
+        }
+      ]
+    },
+    {
+      "id": "calendar-check",
+      "name": "Allow Calendar Availability Check",
+      "description": "Allow checking calendar availability",
+      "tool_name": "calendar",
+      "action": "check_availability",
+      "effect": "PERMIT",
+      "conditions": [
+        {
+          "attribute": "subject.type",
+          "operator": "==",
+          "value": "agent"
+        }
+      ]
+    },
+    {
+      "id": "calendar-create",
+      "name": "Allow Calendar Create",
+      "description": "Allow creating calendar events",
+      "tool_name": "calendar",
+      "action": "create",
+      "effect": "PERMIT",
+      "conditions": [
+        {
+          "attribute": "subject.type",
+          "operator": "==",
+          "value": "agent"
+        }
+      ]
+    },
+    {
+      "id": "calendar-get",
+      "name": "Allow Calendar Get",
+      "description": "Allow fetching calendar events",
+      "tool_name": "calendar",
+      "action": "get",
+      "effect": "PERMIT",
+      "conditions": [
+        {
+          "attribute": "subject.type",
+          "operator": "==",
+          "value": "agent"
+        }
+      ]
+    },
+    {
+      "id": "calendar-add-participants",
+      "name": "Allow Calendar Add Participants",
+      "description": "Allow adding multiple participants",
+      "tool_name": "calendar",
+      "action": "add_participants",
+      "effect": "PERMIT",
+      "conditions": [
+        {
+          "attribute": "subject.type",
+          "operator": "==",
+          "value": "agent"
+        }
+      ]
+    },
+    {
+      "id": "calendar-add-participant",
+      "name": "Allow Calendar Add Participant",
+      "description": "Allow adding a single participant",
+      "tool_name": "calendar",
+      "action": "add_participant",
+      "effect": "PERMIT",
+      "conditions": [
+        {
+          "attribute": "subject.type",
+          "operator": "==",
+          "value": "agent"
+        }
+      ]
+    },
+    {
+      "id": "file-list",
+      "name": "Allow File List",
+      "description": "Allow listing files",
+      "tool_name": "file",
+      "action": "list",
+      "effect": "PERMIT",
+      "conditions": [
+        {
+          "attribute": "subject.type",
+          "operator": "==",
+          "value": "agent"
+        }
+      ]
+    },
+    {
+      "id": "file-read",
+      "name": "Allow File Read",
+      "description": "Allow reading files",
+      "tool_name": "file",
+      "action": "read",
+      "effect": "PERMIT",
+      "conditions": [
+        {
+          "attribute": "subject.type",
+          "operator": "==",
+          "value": "agent"
+        }
+      ]
+    },
+    {
+      "id": "file-get",
+      "name": "Allow File Get",
+      "description": "Allow fetching files",
+      "tool_name": "file",
+      "action": "get",
+      "effect": "PERMIT",
+      "conditions": [
+        {
+          "attribute": "subject.type",
+          "operator": "==",
+          "value": "agent"
+        }
+      ]
+    },
+    {
+      "id": "file-delete",
+      "name": "Allow File Delete",
+      "description": "Allow deleting files",
+      "tool_name": "file",
+      "action": "delete",
+      "effect": "PERMIT",
+      "conditions": [
+        {
+          "attribute": "subject.type",
+          "operator": "==",
+          "value": "agent"
+        }
+      ]
+    }
+  ]
+}

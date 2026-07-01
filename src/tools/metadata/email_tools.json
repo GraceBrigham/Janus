@@ -1,0 +1,122 @@
+{
+  "tool_category": "email",
+  "description": "Email management tools for listing, searching, reading, sending, and deleting messages. Never invent recipients, filenames, dates, or tasks. Use only values obtained from user input or tool outputs in the current run.",
+  "tools": [
+    {
+      "name": "list_emails",
+      "tool_name": "email",
+      "action": "list",
+      "description": "List emails, optionally filtering for unread messages",
+      "signature": {
+        "parameters": {
+          "unread": {
+            "type": "bool",
+            "description": "Filter for unread messages",
+            "required": false,
+            "default": false
+          }
+        },
+        "return": {
+          "type": "str",
+          "description": "Formatted list of matching emails"
+        }
+      }
+    },
+    {
+      "name": "search_emails",
+      "tool_name": "email",
+      "action": "search",
+      "description": "Search emails by sender",
+      "signature": {
+        "parameters": {
+          "from": {
+            "type": "str",
+            "description": "Sender filter (substring match)",
+            "required": false
+          }
+        },
+        "return": {
+          "type": "str",
+          "description": "Formatted list of matching emails"
+        }
+      }
+    },
+    {
+      "name": "get_email",
+      "tool_name": "email",
+      "action": "get",
+      "description": "Get an email by id or sender",
+      "signature": {
+        "parameters": {
+          "id": {
+            "type": "str",
+            "description": "Email identifier",
+            "required": false
+          },
+          "from": {
+            "type": "str",
+            "description": "Sender filter (substring match)",
+            "required": false
+          }
+        },
+        "return": {
+          "type": "str",
+          "description": "Formatted email contents"
+        }
+      }
+    },
+    {
+      "name": "send_email",
+      "tool_name": "email",
+      "action": "send",
+      "description": "Send an email to one recipient per call using values from user input or tool outputs in this run. When a task requests separate emails to multiple recipients, issue separate email.send calls. If attachments are included, retrieve each file with file.get first.",
+      "signature": {
+        "parameters": {
+          "to": {
+            "type": "str",
+            "description": "Single recipient email address for this call (do not combine multiple recipients when separate emails are requested)",
+            "required": true
+          },
+          "subject": {
+            "type": "str",
+            "description": "Email subject line",
+            "required": true
+          },
+          "body": {
+            "type": "str",
+            "description": "Email body content",
+            "required": true
+          },
+          "attachments": {
+            "type": "list",
+            "description": "Filenames to attach (e.g., [\"client-deck.pptx\"]). Each file must be retrieved with file.get before this send call.",
+            "required": false
+          }
+        },
+        "return": {
+          "type": "str",
+          "description": "Result of sending email"
+        }
+      }
+    },
+    {
+      "name": "delete_email",
+      "tool_name": "email",
+      "action": "delete",
+      "description": "Delete an email by id",
+      "signature": {
+        "parameters": {
+          "id": {
+            "type": "str",
+            "description": "Email identifier to delete",
+            "required": true
+          }
+        },
+        "return": {
+          "type": "str",
+          "description": "Result of deleting email"
+        }
+      }
+    }
+  ]
+}

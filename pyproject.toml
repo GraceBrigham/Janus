@@ -1,0 +1,23 @@
+[project]
+name = "user-driven-agent-controls"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "beautifulsoup4==4.12.3",
+    "deprecated>=1.2.18",
+    "google-adk==1.14.1",
+    "html2text==2024.2.26",
+    "jupyterlab",
+    "litellm>=1.77.1",
+    "mcp[cli]==1.14.1",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "python-dotenv",
+    "PyYAML",
+    "requests==2.32.4",
+    "rich",
+    "seaborn",
+]

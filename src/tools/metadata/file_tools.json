@@ -1,0 +1,62 @@
+{
+  "tool_category": "file",
+  "description": "File management tools for listing, fetching, and deleting files. Use exact file values from user input or tool outputs in this run; do not invent filenames.",
+  "tools": [
+    {
+      "name": "list_files",
+      "tool_name": "file",
+      "action": "list",
+      "description": "List available files",
+      "signature": {
+        "parameters": {},
+        "return": {
+          "type": "str",
+          "description": "Formatted list of files"
+        }
+      }
+    },
+    {
+      "name": "get_file",
+      "tool_name": "file",
+      "action": "get",
+      "description": "Get a file by exact path or id from user input or prior tool outputs in this run. Call file.get before any email.send that attaches the file.",
+      "signature": {
+        "parameters": {
+          "path": {
+            "type": "str",
+            "description": "Exact file path to fetch (must come from user input or tool output)",
+            "required": false
+          },
+          "id": {
+            "type": "str",
+            "description": "File identifier to fetch",
+            "required": false
+          }
+        },
+        "return": {
+          "type": "dict",
+          "description": "File metadata and contents"
+        }
+      }
+    },
+    {
+      "name": "delete_file",
+      "tool_name": "file",
+      "action": "delete",
+      "description": "Delete a file by id",
+      "signature": {
+        "parameters": {
+          "id": {
+            "type": "str",
+            "description": "File identifier to delete",
+            "required": true
+          }
+        },
+        "return": {
+          "type": "str",
+          "description": "Confirmation message"
+        }
+      }
+    }
+  ]
+}

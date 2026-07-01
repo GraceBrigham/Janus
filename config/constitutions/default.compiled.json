@@ -1,0 +1,132 @@
+{
+  "constitution_hash": "08c75b5c30ea7937e3328ef097517a46caf7b687d41b6ab19e252f5bdf6938f3",
+  "compiled_at": "2026-04-03T01:02:36.336681",
+  "rules": [
+    {
+      "name": "email-send-requires-approval",
+      "description": "Sending any email requires explicit per-message authorization.",
+      "principle": "Sending email always requires approval.",
+      "tool": "email",
+      "action": "send",
+      "decision": "escalate",
+      "reason": "Emails may only be sent with explicit user approval in every instance."
+    },
+    {
+      "name": "email-delete-requires-approval",
+      "description": "Deleting emails requires explicit user confirmation.",
+      "principle": "Deleting any resource requires approval.",
+      "tool": "email",
+      "action": "delete",
+      "decision": "escalate",
+      "reason": "Email deletion is irreversible and must be explicitly approved by the user."
+    },
+    {
+      "name": "file-delete-requires-approval",
+      "description": "Deleting files requires explicit user confirmation.",
+      "principle": "Deleting any resource requires approval.",
+      "tool": "file",
+      "action": "delete",
+      "decision": "escalate",
+      "reason": "File deletion is irreversible and requires explicit user consent."
+    },
+    {
+      "name": "calendar-create-allowed",
+      "description": "Creating new calendar events is allowed as it is explicitly permitted.",
+      "principle": "Creating and updating calendar events is allowed.",
+      "tool": "calendar",
+      "action": "create",
+      "decision": "allow",
+      "reason": "Calendar event creation is expressly allowed when based on user's explicit request or session output."
+    },
+    {
+      "name": "calendar-add-participant-allowed",
+      "description": "Adding a single participant to a calendar event is allowed.",
+      "principle": "Creating and updating calendar events is allowed.",
+      "tool": "calendar",
+      "action": "add_participant",
+      "decision": "allow",
+      "reason": "Updating calendar events by adding participants is explicitly permitted."
+    },
+    {
+      "name": "calendar-add-participants-allowed",
+      "description": "Adding multiple participants to a calendar event is allowed.",
+      "principle": "Creating and updating calendar events is allowed.",
+      "tool": "calendar",
+      "action": "add_participants",
+      "decision": "allow",
+      "reason": "Updating calendar events by adding participants is explicitly permitted."
+    },
+    {
+      "name": "calendar-check-availability-allowed",
+      "description": "Checking calendar availability is allowed.",
+      "principle": "Calendar reads and availability checks are always allowed.",
+      "tool": "calendar",
+      "action": "check_availability",
+      "decision": "allow",
+      "reason": "Calendar availability checks are always permitted by the constitution."
+    },
+    {
+      "name": "calendar-get-allowed",
+      "description": "Retrieving a specific calendar event is allowed.",
+      "principle": "Calendar reads and availability checks are always allowed.",
+      "tool": "calendar",
+      "action": "get",
+      "decision": "allow",
+      "reason": "Reading calendar events is expressly permitted."
+    },
+    {
+      "name": "calendar-list-allowed",
+      "description": "Listing calendar events is allowed.",
+      "principle": "Calendar reads and availability checks are always allowed.",
+      "tool": "calendar",
+      "action": "list",
+      "decision": "allow",
+      "reason": "Listing calendar events is allowed under the assistant's privacy principles."
+    },
+    {
+      "name": "email-get-allowed",
+      "description": "Retrieving an email is allowed.",
+      "principle": "Reading is always allowed.",
+      "tool": "email",
+      "action": "get",
+      "decision": "allow",
+      "reason": "Reading emails is explicitly permitted by the constitution."
+    },
+    {
+      "name": "email-list-allowed",
+      "description": "Listing emails is allowed.",
+      "principle": "Reading is always allowed.",
+      "tool": "email",
+      "action": "list",
+      "decision": "allow",
+      "reason": "Listing emails is explicitly permitted by the constitution."
+    },
+    {
+      "name": "email-search-allowed",
+      "description": "Searching emails is allowed.",
+      "principle": "Reading is always allowed.",
+      "tool": "email",
+      "action": "search",
+      "decision": "allow",
+      "reason": "Email search operations are allowed without needing prior approval."
+    },
+    {
+      "name": "file-get-allowed",
+      "description": "Retrieving a file is allowed.",
+      "principle": "Reading is always allowed.",
+      "tool": "file",
+      "action": "get",
+      "decision": "allow",
+      "reason": "Fetching files is permitted under the reading allowance of the constitution."
+    },
+    {
+      "name": "file-list-allowed",
+      "description": "Listing files is allowed.",
+      "principle": "Reading is always allowed.",
+      "tool": "file",
+      "action": "list",
+      "decision": "allow",
+      "reason": "Listing files is explicitly permitted as part of the reading rights."
+    }
+  ]
+}

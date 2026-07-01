@@ -1,0 +1,157 @@
+{
+  "tool_category": "calendar",
+  "description": "Calendar management tools for listing, checking, creating, and updating events. Do not invent event titles, participants, dates, or times; use only values from user input or tool outputs in this run.",
+  "tools": [
+    {
+      "name": "list_calendar_events",
+      "tool_name": "calendar",
+      "action": "list",
+      "description": "List calendar events for a specific date",
+      "signature": {
+        "parameters": {
+          "date": {
+            "type": "str",
+            "description": "Date to list events for (YYYY-MM-DD)",
+            "required": true
+          }
+        },
+        "return": {
+          "type": "str",
+          "description": "Formatted list of calendar events"
+        }
+      }
+    },
+    {
+      "name": "check_calendar_availability",
+      "tool_name": "calendar",
+      "action": "check_availability",
+      "description": "Check if a time slot is available",
+      "signature": {
+        "parameters": {
+          "date": {
+            "type": "str",
+            "description": "Date to check (YYYY-MM-DD)",
+            "required": true
+          },
+          "time": {
+            "type": "str",
+            "description": "Time to check (HH:MM)",
+            "required": true
+          }
+        },
+        "return": {
+          "type": "str",
+          "description": "Availability result"
+        }
+      }
+    },
+    {
+      "name": "create_calendar_event",
+      "tool_name": "calendar",
+      "action": "create",
+      "description": "Create a new calendar event",
+      "signature": {
+        "parameters": {
+          "title": {
+            "type": "str",
+            "description": "Event title",
+            "required": true
+          },
+          "date": {
+            "type": "str",
+            "description": "Event date (YYYY-MM-DD)",
+            "required": true
+          },
+          "time": {
+            "type": "str",
+            "description": "Event start time (HH:MM)",
+            "required": true
+          },
+          "description": {
+            "type": "str",
+            "description": "Event description",
+            "required": false,
+            "default": ""
+          },
+          "participants": {
+            "type": "list",
+            "description": "List of attendee email addresses",
+            "required": false,
+            "default": []
+          }
+        },
+        "return": {
+          "type": "str",
+          "description": "Confirmation message about the created event"
+        }
+      }
+    },
+    {
+      "name": "get_calendar_event",
+      "tool_name": "calendar",
+      "action": "get",
+      "description": "Get a calendar event by title",
+      "signature": {
+        "parameters": {
+          "title": {
+            "type": "str",
+            "description": "Event title to retrieve",
+            "required": true
+          }
+        },
+        "return": {
+          "type": "str",
+          "description": "Formatted calendar event"
+        }
+      }
+    },
+    {
+      "name": "add_calendar_participants",
+      "tool_name": "calendar",
+      "action": "add_participants",
+      "description": "Add multiple participants to the active event. Include the exact event title (e.g., title=\"Introductory meeting\") so it's clear which meeting is being updated.",
+      "signature": {
+        "parameters": {
+          "title": {
+            "type": "str",
+            "description": "Exact title of the event to update",
+            "required": true
+          },
+          "participants": {
+            "type": "list",
+            "description": "Attendee email addresses to add",
+            "required": true
+          }
+        },
+        "return": {
+          "type": "str",
+          "description": "Confirmation message"
+        }
+      }
+    },
+    {
+      "name": "add_calendar_participant",
+      "tool_name": "calendar",
+      "action": "add_participant",
+      "description": "Add a single participant to the active event. Include the event title parameter when you call this tool so the correct meeting is targeted.",
+      "signature": {
+        "parameters": {
+          "title": {
+            "type": "str",
+            "description": "Exact title of the event to update",
+            "required": true
+          },
+          "participant": {
+            "type": "str",
+            "description": "Attendee email address to add",
+            "required": true
+          }
+        },
+        "return": {
+          "type": "str",
+          "description": "Confirmation message"
+        }
+      }
+    }
+  ]
+}
