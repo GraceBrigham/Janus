@@ -3,7 +3,6 @@
 .tmp_pycache
 __pycache__
 .env
-uv.lock
 logs/
 metrics.csv
 .DS_Store

@@ -1,0 +1,28 @@
+[artifact]
+name = "Janus"
+description = "A playground for user-involved agentic permission management and evaluation of permission-assistant design choices."
+author = "Janus authors"
+license = "MIT"
+url = "https://zenodo.org/"  # TODO Zenodo link
+[artifact.evaluation]
+availability = "The source, scenario definitions, benchmark harness, and analysis notebook are included in this repository; final public archival should use a DOI-backed repository such as Zenodo after acceptance."
+functionality = "The artifact provides documented installation and runner commands, a checked-in lockfile, and a reusable scenario harness without hard-coded local paths."
+reproducibility = "The benchmark harness can be run from the repository root with scenario selection, assistant selection, and output directory controls. Metrics and logs are generated per run to support independent validation."
+
+[artifact.runtime]
+python = ">=3.13"
+package_manager = "uv"
+model_backend = "OpenAI-compatible via LiteLLM"
+
+[artifact.contents]
+code = ["src/"]
+scenarios = ["scenarios/definitions/"]
+analysis = ["analysis/analysis.ipynb"]
+configs = ["config/", ".env.example"]
+metrics = ["metrics/", "runs/"]
+
+[artifact.commands]
+install = "uv sync"
+setup_env = "cp .env.example .env && # set OPENAI_API_KEY in .env"
+core_run = "uv run python -m src.scripts.run_core --permission-assistant risk_assessment"
+harness_run = "uv run python -m src.scripts.run_harness --scenarios 1 --subscenarios attack --permission-assistants risk_assessment --synthetic-responder-modes alignment_aware --risk-tolerances 0.35 --repetitions 1 --output-dir runs/ae_smoke"
