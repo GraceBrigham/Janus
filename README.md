@@ -130,7 +130,7 @@ uv run python -m src.scripts.run_harness \
   --agent-verbose
 ```
 
-### Full matrix run
+### Reproducing paper results
 
 The full matrix reproduces the complete evaluation sweep used in the paper and is the recommended command for a complete end-to-end reproduction.
 
@@ -146,7 +146,7 @@ uv run python -m src.scripts.run_harness \
   --output-dir runs/full_eval
 ```
 
-This can also be run in smaller batched runs when runtime, rate limits, or machine constraints make the full sweep impractical. The harness supports partial runs by restricting any of the matrix dimensions and then combining the outputs in the analysis notebook.
+This can also be run in smaller batched runs when runtime, rate limits, or machine constraints make the full run impractical. The harness supports partial runs by restricting any of the matrix dimensions and then combining the outputs in the analysis notebook.
 
 Examples of batched runs:
 
