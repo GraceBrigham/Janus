@@ -14,7 +14,10 @@ For readers coming from the paper, these documents provide more information on t
 
 ## Artifact Overview
 
-This repository contains the complete Janus artifact: source code, scenario definitions, evaluation harness, and analysis materials. The final public archive will be deposited on Zenodo after acceptance; GitHub is used for development and dissemination, not as the permanent archival record.
+This repository contains the complete Janus artifact: source code, scenario definitions, evaluation harness, and analysis materials. The same project is maintained on GitHub for active development and archived on Zenodo for stable citation and long-term access.
+
+- Zenodo record: https://zenodo.org/records/22800573
+- GitHub repository: https://github.com/GraceBrigham/Janus
 
 The project includes:
 
