@@ -4,14 +4,6 @@ Janus is the companion codebase for our academic work on user-involved permissio
 
 ![Janus system overview](assets/SystemOverview.png)
 
-## Repository Guide
-
-For readers coming from the paper, these documents provide more information on the repo:
-
-- [design_space_table.md](design_space_table.md): permission management design space table
-- [evaluation_scenarios.md](evaluation_scenarios.md): full definitions of the evaluation tasks, user profiles, attack cases, and alignment criteria used in the experiments
-- [architecture.md](architecture.md): architecture overview, execution flow, and assistant-by-assistant design notes
-
 ## Artifact Overview
 
 This repository contains the complete Janus artifact: source code, scenario definitions, evaluation harness, and analysis materials. The same project is maintained on GitHub for active development and archived on Zenodo for stable citation and long-term access.
@@ -22,11 +14,15 @@ This repository contains the complete Janus artifact: source code, scenario defi
 The project includes:
 
 - the source code and core logic in [src](src)
-- the benchmark scenarios and evaluation data in [scenarios/definitions](scenarios/definitions)
+- the scenarios and evaluation data in [scenarios/definitions](scenarios/definitions)
 - the analysis notebook in [analysis/analysis.ipynb](analysis/analysis.ipynb)
 - the evaluation harness entrypoints in [src/scripts](src/scripts)
 - the dependency metadata in [pyproject.toml](pyproject.toml) and [uv.lock](uv.lock)
 - generated metrics and logs in [metrics](metrics) and output directories such as `runs/*`
+- additional documentation:
+  - [design_space_table.md](design_space_table.md): permission management design space table
+  - [evaluation_scenarios.md](evaluation_scenarios.md): full definitions of the evaluation tasks, user profiles, attack cases, and alignment criteria used in the experiments
+  - [architecture.md](architecture.md): architecture overview, execution flow, and assistant-by-assistant design notes
 
 ## Setup
 
@@ -133,6 +129,33 @@ uv run python -m src.scripts.run_harness \
   --agent-verbose
 ```
 
+Useful flags:
+
+- `--scenarios 1,2,3` or `--scenarios all`
+- `--subscenarios attack,balanced` or `--subscenarios all`
+- `--permission-assistants ...` or `--permission-assistants all`
+- `--synthetic-responder`
+- `--synthetic-responder-modes {always_yes,always_no,alignment_aware}` or `all`
+- `--risk-tolerances 0.2,0.7`
+- `--repetitions 5`
+- `--output-dir runs/my_experiment`
+- `--permission-manager-verbose`
+- `--permission-assistant-verbose`
+- `--agent-verbose`
+- `--policy-file path/to/policies.json`
+- `--judge-model openai/o3-mini`
+- `--max-followups 5`
+- `--constitution-file config/constitutions/default.md`
+- `--no-constitution-auto-approve`
+
+Synthetic responder modes:
+
+- `always_yes`: always approves permission prompts
+- `always_no`: always rejects permission prompts
+- `alignment_aware`: rejects attack/out-of-alignment calls and approves others
+
+Scenario definitions live under [scenarios/definitions](scenarios/definitions). Combined definitions include tool seed data plus `eval` sections for desired, out-of-alignment, and attack tool-call expectations.
+
 ### Reproducing paper results
 
 The full matrix reproduces the complete evaluation sweep used in the paper and is the recommended command for a complete end-to-end reproduction.
@@ -188,33 +211,6 @@ uv run python -m src.scripts.run_harness \
   --repetitions 1 \
   --output-dir runs/quick_validation
 ```
-
-Useful flags:
-
-- `--scenarios 1,2,3` or `--scenarios all`
-- `--subscenarios attack,balanced` or `--subscenarios all`
-- `--permission-assistants ...` or `--permission-assistants all`
-- `--synthetic-responder`
-- `--synthetic-responder-modes {always_yes,always_no,alignment_aware}` or `all`
-- `--risk-tolerances 0.2,0.7`
-- `--repetitions 5`
-- `--output-dir runs/my_experiment`
-- `--permission-manager-verbose`
-- `--permission-assistant-verbose`
-- `--agent-verbose`
-- `--policy-file path/to/policies.json`
-- `--judge-model openai/o3-mini`
-- `--max-followups 5`
-- `--constitution-file config/constitutions/default.md`
-- `--no-constitution-auto-approve`
-
-Synthetic responder modes:
-
-- `always_yes`: always approves permission prompts
-- `always_no`: always rejects permission prompts
-- `alignment_aware`: rejects attack/out-of-alignment calls and approves others
-
-Scenario definitions live under [scenarios/definitions](scenarios/definitions). Combined definitions include tool seed data plus `eval` sections for desired, out-of-alignment, and attack tool-call expectations.
 
 ## Analysis
 
