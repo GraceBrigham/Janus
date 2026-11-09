@@ -142,7 +142,7 @@ def create_tools() -> FunctionTool:
     delete_file_tool = registry.create_tool("file", "delete_file", delete_file)
     
     # Create model
-    model = LiteLlm(model="openai/o3-mini")
+    model = LiteLlm(model="openai/gpt-4.1-mini")
     
     # Create the agent using LiteLLM
     base_instruction = """You are a workplace assistant that can help with various office tasks:
