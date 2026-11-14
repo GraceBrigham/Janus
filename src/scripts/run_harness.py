@@ -7,7 +7,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
+import subprocess
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Iterable, List
@@ -23,6 +26,7 @@ from src.scripts.subscenario_runner import (
     SubscenarioRunner,
 )
 from src.scripts.synthetic_responder import AVAILABLE_SYNTHETIC_RESPONDER_MODES
+from src.utils.model_config import active_preset, add_model_arguments, configure_from_args, resolved_models
 
 
 def _parse_csv_values(raw: str, allowed: Iterable[str], label: str) -> List[str]:
@@ -187,11 +191,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Path to a policies.json file to load. If omitted, start with no policies.",
     )
-    parser.add_argument(
-        "--judge-model",
-        default="openai/o3-mini",
-        help="Model used to decide complete vs follow_up after each response.",
-    )
+    add_model_arguments(parser)
     parser.add_argument(
         "--max-followups",
         type=int,
@@ -213,7 +213,41 @@ def parse_args() -> argparse.Namespace:
     if args.repetitions < 1:
         parser.error("--repetitions must be at least 1.")
 
+    configure_from_args(args)
+
     return args
+
+
+def _git_commit() -> str:
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+        dirty = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=no"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        return commit + ("-dirty" if dirty else "")
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+
+
+def _write_run_config(args: argparse.Namespace, models: dict, total_runs: int) -> None:
+    """Record the models and settings of this harness invocation next to its outputs."""
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    config = {
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "git_commit": _git_commit(),
+        "model_preset": active_preset(),
+        "models": models,
+        "planned_runs": total_runs,
+        "args": {k: v for k, v in vars(args).items()},
+    }
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    path = output_dir / f"run_config_{stamp}.json"
+    path.write_text(json.dumps(config, indent=2, default=str) + "\n")
+    print(f"Run config written to {path}")
 
 
 async def _main() -> int:
@@ -221,7 +255,10 @@ async def _main() -> int:
     runs = _expand_runs(args)
     total_runs = len(runs)
 
+    models = resolved_models()
+    _write_run_config(args, models, total_runs)
     print(f"Planned {total_runs} harness run(s).")
+    print(f"Models (preset={active_preset()}): " + ", ".join(f"{k}={v}" for k, v in models.items()))
     for index, run_args in enumerate(runs, start=1):
         responder_mode = (
             run_args.synthetic_responder_mode if run_args.synthetic_responder else "disabled"

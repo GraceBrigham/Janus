@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 import json
 
 from google.adk.models.lite_llm import LiteLlm
+from src.utils.model_config import model_name
 from google.adk.models.llm_request import LlmRequest
 from google.genai import types
 
@@ -20,7 +21,7 @@ class ToolPolicySuggestionPermissionAssistant(BasePermissionAssistant):
         **_: Any,
     ):
         super().__init__(verbose=verbose, metrics=metrics)
-        self.model = LiteLlm(model="openai/o3-mini")
+        self.model = LiteLlm(model=model_name("assistant"))
         self.dumb_mode = dumb_mode
 
     async def handle_permission_denial(
