@@ -26,19 +26,23 @@ from typing import Dict, Optional
 ROLES = ("agent", "assistant", "judge")
 
 PRESETS: Dict[str, Dict[str, str]] = {
-    # The configuration used for the local reproduction runs in runs/.
+    # Record of the configuration used for the Nov 2026 reproduction runs in runs/.
+    # o3-mini has since been retired by OpenAI (404 model_not_found), so this
+    # preset no longer runs; it is kept only to document those runs.
     "reproduction": {
         "agent": "openai/gpt-4.1-mini",
         "assistant": "openai/o3-mini",
         "judge": "openai/o3-mini",
     },
-    # Matches the Janus paper (o3-mini for all LLM calls). Use for reported results.
+    # For reported results. The Janus paper used o3-mini for every LLM call; it is
+    # retired, so gpt-5-mini (a small reasoning model) replaces it in every role.
+    # Baselines must be rerun under this preset, not compared to the paper's numbers.
     "paper": {
-        "agent": "openai/o3-mini",
-        "assistant": "openai/o3-mini",
-        "judge": "openai/o3-mini",
+        "agent": "openai/gpt-5-mini",
+        "assistant": "openai/gpt-5-mini",
+        "judge": "openai/gpt-5-mini",
     },
-    # Cheapest: roughly half the cost per run. Use for debugging, not for reported results.
+    # Cheapest (~$0.01 per run, measured). Use for building and debugging.
     "debug": {
         "agent": "openai/gpt-4.1-mini",
         "assistant": "openai/gpt-4.1-mini",
@@ -46,7 +50,7 @@ PRESETS: Dict[str, Dict[str, str]] = {
     },
 }
 
-DEFAULT_PRESET = "reproduction"
+DEFAULT_PRESET = "debug"
 PRESET_ENV = "JANUS_MODEL_PRESET"
 
 
@@ -101,9 +105,9 @@ def add_model_arguments(parser, *, include_judge: bool = True) -> None:
         default=None,
         help=(
             f"Model preset (default: ${PRESET_ENV} or '{DEFAULT_PRESET}'). "
-            "'paper' = o3-mini everywhere (matches Janus); "
+            "'paper' = gpt-5-mini everywhere (for reported results; replaces the retired o3-mini); "
             "'debug' = gpt-4.1-mini everywhere (cheapest); "
-            "'reproduction' = gpt-4.1-mini agent, o3-mini assistants and judge."
+            "'reproduction' = record of the Nov 2026 reproduction setup (uses retired o3-mini, no longer runs)."
         ),
     )
     parser.add_argument("--agent-model", default=None, help="Override the agent model (LiteLLM string).")
