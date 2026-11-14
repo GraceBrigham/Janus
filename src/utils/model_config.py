@@ -132,3 +132,13 @@ def configure_from_args(args) -> Dict[str, str]:
     if hasattr(args, "judge_model"):
         args.judge_model = models["judge"]
     return models
+
+
+def make_model(role: str, model: Optional[str] = None):
+    """Build a LiteLlm for ``role``, tagged so usage_tracker can attribute its cost."""
+    from google.adk.models.lite_llm import LiteLlm
+
+    from src.utils import usage_tracker
+
+    usage_tracker.install()
+    return LiteLlm(model=model or model_name(role), metadata={"janus_role": role})

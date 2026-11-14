@@ -86,6 +86,7 @@ def _build_single_run_args(
         permission_assistant_verbose=base_args.permission_assistant_verbose,
         agent_verbose=base_args.agent_verbose,
         policy_file=base_args.policy_file,
+        grants_file=base_args.grants_file,
         task_assistant_risk_tolerance=risk_tolerance,
         synthetic_responder=True,
         synthetic_responder_mode=synthetic_responder_mode,
@@ -186,6 +187,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--permission-manager-verbose", action="store_true")
     parser.add_argument("--permission-assistant-verbose", action="store_true")
     parser.add_argument("--agent-verbose", action="store_true")
+    parser.add_argument(
+        "--grants-file",
+        default=None,
+        help="PERMIT: JSON file of explicit user grants, installed as in-memory PERMIT policies.",
+    )
     parser.add_argument(
         "--policy-file",
         default=None,

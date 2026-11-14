@@ -2,7 +2,7 @@
 
 from google.adk.agents import LlmAgent
 from google.adk.models.lite_llm import LiteLlm
-from src.utils.model_config import model_name
+from src.utils.model_config import make_model
 from google.adk.tools import FunctionTool
 from google.adk.tools.tool_context import ToolContext
 from typing import Dict, Any, Optional
@@ -143,7 +143,7 @@ def create_tools() -> FunctionTool:
     delete_file_tool = registry.create_tool("file", "delete_file", delete_file)
     
     # Create model
-    model = LiteLlm(model=model_name("agent"))
+    model = make_model("agent")
     
     # Create the agent using LiteLLM
     base_instruction = """You are a workplace assistant that can help with various office tasks:

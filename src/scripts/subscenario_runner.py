@@ -21,6 +21,9 @@ from rich import print
 from rich.markup import escape
 
 from src.agent import create_agent
+from src.utils import usage_tracker
+from src.permit.grants import install_grants, load_grants
+from src.utils.model_config import make_model
 from src.utils.metrics import RunMetrics
 from src.permissions.permission_manager import PermissionManager
 from src.scripts.runner_common import (
@@ -168,7 +171,15 @@ class SubscenarioRunner:
             constitution_file=args.constitution_file,
             constitution_use_auto_approve=not args.no_constitution_auto_approve,
         )
-        self.judge_model = LiteLlm(model=args.judge_model)
+        grants_file = getattr(args, "grants_file", None)
+        if grants_file:
+            installed = install_grants(self.permission_mgr, load_grants(grants_file))
+            run_logger.log(
+                f"PERMIT: installed {len(installed)} grant(s) from {grants_file}: "
+                + ", ".join(p.name for p in installed)
+            )
+        self.judge_model = make_model("judge", args.judge_model)
+        usage_tracker.reset()
         if self.synthetic_responder_enabled:
             self.permission_mgr.set_prompt_hooks(
                 ask_hook=self._synthetic_permission_prompt,
@@ -254,6 +265,11 @@ class SubscenarioRunner:
         tool_summary = self.tool_call_evaluator.summary()
         self.metrics.set_evaluation_data(output_results=goal_data)
 
+        usage = usage_tracker.snapshot()
+        self.metrics.set_llm_usage(usage)
+        usage_text = usage_tracker.format_summary(usage)
+        print(f"[blue]{usage_text}[/blue]")
+        run_logger.log(usage_text)
         summary_text = self.metrics.summary()
         print(f"\n[blue]{summary_text}[/blue]")
         run_logger.log("Run summary:\n" + summary_text)

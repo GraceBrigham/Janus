@@ -5,7 +5,7 @@ import json
 import uuid
 
 from google.adk.models.lite_llm import LiteLlm
-from src.utils.model_config import model_name
+from src.utils.model_config import make_model
 from google.adk.models.llm_request import LlmRequest
 from google.genai import types
 
@@ -26,7 +26,7 @@ class TaskPolicyPermissionAssistant(BasePermissionAssistant):
         super().__init__(verbose=verbose, metrics=metrics)
         self.tasks: Dict[str, Dict[str, Any]] = {}
         self.current_task_id: Optional[str] = None
-        self.model = LiteLlm(model=model_name("assistant"))
+        self.model = make_model("assistant")
         self.risk_tolerance = max(0.0, min(1.0, risk_tolerance))
 
     async def handle_user_message(self, message: str) -> None:

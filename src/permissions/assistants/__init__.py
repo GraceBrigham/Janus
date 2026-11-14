@@ -1,6 +1,10 @@
 from src.permissions.assistants.auto_approve import AutoApprovePermissionAssistant
 from src.permissions.assistants.base import BasePermissionAssistant
 from src.permissions.assistants.constitution import ConstitutionPermissionAssistant
+from src.permissions.assistants.grant_only import (
+    GrantOnlyPermissionAssistant,
+    NoAskPermissionAssistant,
+)
 from src.permissions.assistants.risk_assessment_autonomous import (
     RiskAssessmentAutonomousPermissionAssistant,
 )
@@ -24,6 +28,8 @@ __all__ = [
     "AutoApprovePermissionAssistant",
     "BasePermissionAssistant",
     "ConstitutionPermissionAssistant",
+    "GrantOnlyPermissionAssistant",
+    "NoAskPermissionAssistant",
     "RiskAssessmentAutonomousPermissionAssistant",
     "TaskPolicyPermissionAssistant",
     "ToolPolicySuggestionPermissionAssistant",

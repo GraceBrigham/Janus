@@ -5,6 +5,7 @@ from typing import Any, Dict, Type
 from src.permissions.assistants.auto_approve import AutoApprovePermissionAssistant
 from src.permissions.assistants.base import BasePermissionAssistant
 from src.permissions.assistants.constitution import ConstitutionPermissionAssistant
+from src.permissions.assistants.grant_only import NoAskPermissionAssistant
 from src.permissions.assistants.risk_assessment_autonomous import (
     RiskAssessmentAutonomousPermissionAssistant,
 )
@@ -32,6 +33,7 @@ ASSISTANT_REGISTRY: Dict[str, Type[BasePermissionAssistant]] = {
     "user_confirmation": UserConfirmationPermissionAssistant,
     "auto_approve": AutoApprovePermissionAssistant,
     "constitution": ConstitutionPermissionAssistant,
+    "no_ask": NoAskPermissionAssistant,
 }
 
 AVAILABLE_PERMISSION_ASSISTANTS = tuple(sorted(ASSISTANT_REGISTRY.keys()))
