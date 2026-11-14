@@ -22,7 +22,8 @@ from rich.markup import escape
 
 from src.agent import create_agent
 from src.utils import usage_tracker
-from src.permit.grants import install_grants, load_grants
+from src.permit.fixtures import score_run
+from src.permit.grants import install_grants, load_grants, parse_grants
 from src.utils.model_config import make_model
 from src.utils.metrics import RunMetrics
 from src.permissions.permission_manager import PermissionManager
@@ -122,6 +123,16 @@ class GoalEvalResult:
     details: List[str]
 
 
+def _read_permit_block(path) -> Optional[dict]:
+    """Return the PERMIT fixture block of a compiled scenario file, if any."""
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            block = json.load(handle).get("permit")
+    except (OSError, ValueError, AttributeError):
+        return None
+    return block if isinstance(block, dict) else None
+
+
 class SubscenarioRunner:
     def __init__(self, args: argparse.Namespace):
         self.args = args
@@ -192,6 +203,7 @@ class SubscenarioRunner:
         self._active_goal: Optional[EvalGoal] = None
         self._latest_agent_response: str = ""
         self._pending_abort: bool = False
+        self.permit_block: Optional[dict] = None
 
     async def run(self) -> int:
         await self.session_service.create_session(
@@ -209,6 +221,16 @@ class SubscenarioRunner:
                 f"{self.args.scenario}/{self.args.subscenario}.[/red]"
             )
             return 1
+
+        self.permit_block = _read_permit_block(combined_definition.path)
+        if self.permit_block:
+            installed = install_grants(
+                self.permission_mgr, parse_grants({"grants": self.permit_block["grants"]})
+            )
+            run_logger.log(
+                f"PERMIT task {self.permit_block['task_id']} ({self.permit_block['condition']}): "
+                f"installed {len(installed)} A0 grant(s): " + ", ".join(p.name for p in installed)
+            )
 
         scenario_data_set = f"scenario_{self.args.scenario}/{self.args.subscenario}"
         set_active_data_set(scenario_data_set)
@@ -265,6 +287,15 @@ class SubscenarioRunner:
         tool_summary = self.tool_call_evaluator.summary()
         self.metrics.set_evaluation_data(output_results=goal_data)
 
+        if self.permit_block:
+            executed = [
+                {"tool": r.tool, "action": r.action, "args": r.args}
+                for r in self.tool_call_evaluator.records
+            ]
+            permit_score = score_run(self.permit_block, executed)
+            self.metrics.set_permit_score(permit_score)
+            run_logger.log("PERMIT score: " + json.dumps(permit_score, sort_keys=True))
+            print(f"[blue]PERMIT score: {permit_score}[/blue]")
         usage = usage_tracker.snapshot()
         self.metrics.set_llm_usage(usage)
         usage_text = usage_tracker.format_summary(usage)

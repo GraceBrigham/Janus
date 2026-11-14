@@ -32,6 +32,10 @@ class RunMetrics:
     output_passes: int = 0
     output_fails: int = 0
     llm_usage: dict = field(default_factory=dict)
+    permit_score: dict = field(default_factory=dict)
+
+    def set_permit_score(self, score: dict) -> None:
+        self.permit_score = score or {}
 
     def set_llm_usage(self, usage: dict) -> None:
         self.llm_usage = usage or {}
@@ -207,6 +211,13 @@ class RunMetrics:
             "reasoning_tokens",
             "cost_usd",
             "llm_usage_by_role",
+            "permit_task",
+            "permit_condition",
+            "permit_route",
+            "permit_quality",
+            "permit_routes_completed",
+            "permit_unauthorized_executed",
+            "permit_denied_preference_executed",
         ]
         row = [
             self.run_id or "",
@@ -245,6 +256,13 @@ class RunMetrics:
                 else ""
             ),
             json.dumps(self.llm_usage.get("by_role_model", []), ensure_ascii=False),
+            str(self.permit_score.get("permit_task", "")),
+            str(self.permit_score.get("permit_condition", "")),
+            str(self.permit_score.get("permit_route", "")),
+            (str(self.permit_score["permit_quality"]) if self.permit_score else ""),
+            json.dumps(self.permit_score.get("permit_routes_completed", [])) if self.permit_score else "",
+            json.dumps(self.permit_score.get("permit_unauthorized_executed", [])) if self.permit_score else "",
+            json.dumps(self.permit_score.get("permit_denied_preference_executed", [])) if self.permit_score else "",
         ]
         should_write_header = not os.path.exists(path) or os.path.getsize(path) == 0
         with open(path, "a", newline="") as handle:

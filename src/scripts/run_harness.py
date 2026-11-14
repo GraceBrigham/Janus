@@ -29,10 +29,25 @@ from src.scripts.synthetic_responder import AVAILABLE_SYNTHETIC_RESPONDER_MODES
 from src.utils.model_config import active_preset, add_model_arguments, configure_from_args, resolved_models
 
 
-def _parse_csv_values(raw: str, allowed: Iterable[str], label: str) -> List[str]:
+PERMIT_SCENARIO = "permit"
+
+
+def _scenario_choices() -> List[str]:
+    return list(AVAILABLE_SCENARIOS) + [PERMIT_SCENARIO]
+
+
+def _subscenario_choices() -> List[str]:
+    from src.permit.fixtures import compiled_task_ids
+
+    return list(AVAILABLE_SUBSCENARIOS) + compiled_task_ids()
+
+
+def _parse_csv_values(
+    raw: str, allowed: Iterable[str], label: str, all_values: Iterable[str] | None = None
+) -> List[str]:
     allowed_values = list(allowed)
     if raw.strip().lower() == "all":
-        return allowed_values
+        return list(all_values) if all_values is not None else allowed_values
 
     selected: List[str] = []
     for item in raw.split(","):
@@ -100,7 +115,18 @@ def _build_single_run_args(
     )
 
 
+def _definition_exists(scenario: str, subscenario: str) -> bool:
+    root = Path(__file__).resolve().parents[2]
+    return (root / "scenarios" / "definitions" / f"scenario_{scenario}" / f"{subscenario}.json").exists()
+
+
 def _expand_runs(args: argparse.Namespace) -> List[SimpleNamespace]:
+    skipped = [
+        f"{s}/{ss}" for s in args.scenarios for ss in args.subscenarios
+        if not _definition_exists(s, ss)
+    ]
+    if skipped:
+        print(f"Skipping {len(skipped)} scenario/subscenario pair(s) with no definition file.")
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -115,6 +141,8 @@ def _expand_runs(args: argparse.Namespace) -> List[SimpleNamespace]:
 
         for scenario in args.scenarios:
             for subscenario in args.subscenarios:
+                if not _definition_exists(scenario, subscenario):
+                    continue
                 for mode in responder_modes:
                     for risk_tolerance in assistant_risks:
                         for _ in range(args.repetitions):
@@ -138,15 +166,24 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--scenarios",
-        type=lambda raw: _parse_csv_values(raw, AVAILABLE_SCENARIOS, "scenario"),
+        type=lambda raw: _parse_csv_values(
+            raw, _scenario_choices(), "scenario", all_values=AVAILABLE_SCENARIOS
+        ),
         default=list(AVAILABLE_SCENARIOS),
-        help="Comma-separated scenario IDs or 'all'. Default: all.",
+        help=(
+            "Comma-separated scenario IDs or 'all' (= the Janus scenarios 1,2,3). "
+            "Use 'permit' for the PERMIT route fixtures."
+        ),
     )
     parser.add_argument(
         "--subscenarios",
-        type=lambda raw: _parse_csv_values(raw, AVAILABLE_SUBSCENARIOS, "subscenario"),
+        type=lambda raw: _parse_csv_values(raw, _subscenario_choices(), "subscenario"),
         default=list(AVAILABLE_SUBSCENARIOS),
-        help="Comma-separated subscenarios or 'all'. Default: all.",
+        help=(
+            "Comma-separated subscenarios or 'all'. Default: the Janus subscenarios. "
+            "For --scenarios permit, use PERMIT task ids (or 'all'). "
+            "Scenario/subscenario pairs without a definition file are skipped."
+        ),
     )
     parser.add_argument(
         "--permission-assistants",
