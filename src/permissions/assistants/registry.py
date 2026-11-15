@@ -8,8 +8,10 @@ from src.permissions.assistants.constitution import ConstitutionPermissionAssist
 from src.permissions.assistants.grant_only import NoAskPermissionAssistant
 from src.permissions.assistants.route_controlled import (
     RouteAskAllPermissionAssistant,
+    RouteEVAPermissionAssistant,
     RouteNoAskPermissionAssistant,
     RouteOraclePermissionAssistant,
+    RouteUncertaintyPermissionAssistant,
 )
 from src.permissions.assistants.risk_assessment_autonomous import (
     RiskAssessmentAutonomousPermissionAssistant,
@@ -42,6 +44,8 @@ ASSISTANT_REGISTRY: Dict[str, Type[BasePermissionAssistant]] = {
     "route_no_ask": RouteNoAskPermissionAssistant,
     "route_ask_all": RouteAskAllPermissionAssistant,
     "route_oracle": RouteOraclePermissionAssistant,
+    "route_eva": RouteEVAPermissionAssistant,
+    "route_uncertainty": RouteUncertaintyPermissionAssistant,
 }
 
 AVAILABLE_PERMISSION_ASSISTANTS = tuple(sorted(ASSISTANT_REGISTRY.keys()))

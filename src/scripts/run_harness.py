@@ -102,6 +102,7 @@ def _build_single_run_args(
         agent_verbose=base_args.agent_verbose,
         policy_file=base_args.policy_file,
         grants_file=base_args.grants_file,
+        permit_settings=_permit_settings(base_args),
         task_assistant_risk_tolerance=risk_tolerance,
         synthetic_responder=True,
         synthetic_responder_mode=synthetic_responder_mode,
@@ -113,6 +114,16 @@ def _build_single_run_args(
         no_constitution_auto_approve=base_args.no_constitution_auto_approve,
         run_id=run_id,
     )
+
+
+def _permit_settings(args: argparse.Namespace) -> dict:
+    return {
+        "cost": args.permit_question_cost,
+        "budget": args.permit_question_budget,
+        "prior": args.permit_prior,
+        "margin": args.permit_margin,
+        "threshold": args.permit_uncertainty_threshold,
+    }
 
 
 def _definition_exists(scenario: str, subscenario: str) -> bool:
@@ -224,6 +235,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--permission-manager-verbose", action="store_true")
     parser.add_argument("--permission-assistant-verbose", action="store_true")
     parser.add_argument("--agent-verbose", action="store_true")
+    parser.add_argument("--permit-question-cost", type=float, default=0.1,
+                        help="PERMIT route_eva: cost of one question, in route-quality units (default 0.1).")
+    parser.add_argument("--permit-question-budget", type=int, default=None,
+                        help="PERMIT route_eva: max questions per task (default: no cap).")
+    parser.add_argument("--permit-prior", type=float, default=0.5,
+                        help="PERMIT: P(grant) for atoms without a model hint (default 0.5).")
+    parser.add_argument("--permit-margin", type=float, default=0.1,
+                        help="PERMIT: lower bound = p - margin (placeholder for the conformal bound).")
+    parser.add_argument("--permit-uncertainty-threshold", type=float, default=0.3,
+                        help="PERMIT route_uncertainty: ask when |p - 0.5| < threshold (default 0.3).")
     parser.add_argument(
         "--grants-file",
         default=None,

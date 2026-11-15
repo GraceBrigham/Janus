@@ -24,7 +24,7 @@ from src.agent import create_agent
 from src.utils import usage_tracker
 from dataclasses import asdict
 from src.permit.fixtures import score_run
-from src.permit.routes import POLICIES as ROUTE_POLICIES, render_plan, run_controller, truth_answer
+from src.permit.routes import build_policy as build_route_policy, render_plan, run_controller, truth_answer
 from src.permit.grants import install_grants, load_grants, parse_grants
 from src.utils.model_config import make_model
 from src.utils.metrics import RunMetrics
@@ -340,7 +340,9 @@ class SubscenarioRunner:
     def _run_route_controller(self, policy_name: str) -> None:
         """PERMIT route layer: ask up front, grant yes-answers, plan the route."""
         block = self.permit_block
-        result = run_controller(block, ROUTE_POLICIES[policy_name], truth_answer(block))
+        settings = getattr(self.args, "permit_settings", None) or {}
+        result = run_controller(block, build_route_policy(policy_name, settings), truth_answer(block))
+        run_logger.log("PERMIT policy settings: " + json.dumps(settings, sort_keys=True))
         for atom_id in result.questions:
             self.metrics.increment_permission_assistant()
             self.metrics.increment_user()

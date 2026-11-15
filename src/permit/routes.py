@@ -75,8 +75,12 @@ class RoutePolicy:
 
     name = "base"
 
-    def decide(self, block: Block, ask: Callable[[str, str], bool]) -> None:
-        """Call ``ask(atom_id, reason)`` for each question; it returns the answer."""
+    def decide(self, block: Block, ask: Callable[[str, str], bool]) -> Optional[Dict[str, Dict[str, Any]]]:
+        """Call ``ask(atom_id, reason)`` for each question; it returns the answer.
+
+        May return notes ``{atom_id: {"reason": ..., **details}}``; reasons apply
+        to atoms that were not asked, details are attached to every listed atom.
+        """
         raise NotImplementedError
 
 
@@ -116,7 +120,177 @@ class OraclePolicy(RoutePolicy):
                 ask(step, f"oracle: needed for {route['id']} (quality {target})")
 
 
+# ---- preference models (placeholder until the Wu et al. predictor exists) ---------
+@dataclass
+class Estimate:
+    p: float          # point estimate of P(user grants)
+    p_lower: float    # lower confidence bound used for decisions
+    source: str
+
+
+class PreferenceModel:
+    """Interface: estimate P(grant) for one atom. Estimates only steer asking;
+    they never authorise anything."""
+
+    def estimate(self, block: Block, atom_id: str) -> Estimate:
+        raise NotImplementedError
+
+
+class HintOrPriorModel(PreferenceModel):
+    """Uses the fixture's ``model_hint`` if present, else a fixed prior; the
+    lower bound is the point estimate minus a fixed margin. A stand-in for the
+    split-conformal bound of the planned predictor."""
+
+    def __init__(self, prior: float = 0.5, margin: float = 0.1):
+        self.prior = prior
+        self.margin = margin
+
+    def estimate(self, block, atom_id):
+        hint = block["atoms"][atom_id].get("model_hint")
+        p = float(hint["p_grant"]) if hint else self.prior
+        return Estimate(p, max(0.0, min(1.0, p - self.margin)), "hint" if hint else "prior")
+
+
+# ---- EVA: expected value of asking over routes -------------------------------------
+class EVAPolicy(RoutePolicy):
+    """Ask only when a route's expected gain beats the expected cost of asking.
+
+    Each round, relative to the best route feasible right now:
+      gap(R)      = quality(R) - current best quality
+      prune R     if gap(R) <= cost, or R needs more questions than the budget
+                  left, or R needs an atom the user already refused
+                  (admissible: asking costs >= cost, gain <= gap; no model call)
+      P_all(R)    = product of lower bounds p_lower over R's missing atoms
+      E_q(R)      = expected questions when asking least-likely-first and
+                    stopping at the first "no"
+      value(R)    = P_all(R) * gap(R) - cost * E_q(R)
+    Ask the missing atoms of the best positive-value route (ties: fewer missing
+    atoms, then fixture order), stop at the first "no", and repeat. Routes are
+    conjunctive, so this values a route that needs two grants correctly even
+    though each grant alone is worth nothing.
+    """
+
+    name = "eva"
+
+    def __init__(self, cost: float = 0.1, budget: Optional[int] = None,
+                 model: Optional[PreferenceModel] = None):
+        if cost < 0:
+            raise ValueError("question cost must be >= 0")
+        self.cost = cost
+        self.budget = budget
+        self.model = model or HintOrPriorModel()
+
+    def decide(self, block, ask):
+        a0 = authorized(block)
+        granted: Set[str] = set()
+        refused: Set[str] = set()
+        estimates: Dict[str, Estimate] = {}
+        notes: Dict[str, Dict[str, Any]] = {}
+        asked = 0
+        model_calls = 0
+        order = {r["id"]: i for i, r in enumerate(block["routes"])}
+
+        def est(atom_id):
+            nonlocal model_calls
+            if atom_id not in estimates:
+                estimates[atom_id] = self.model.estimate(block, atom_id)
+                model_calls += 1
+            return estimates[atom_id]
+
+        while True:
+            current = best_quality(block, granted)
+            left = None if self.budget is None else self.budget - asked
+            best = None
+            for route in block["routes"]:
+                missing = [s for s in route["steps"] if s not in a0 and s not in granted]
+                gap = round(route["quality"] - current, 6)
+                if not missing or any(m in refused for m in missing):
+                    continue
+                if gap <= 0:
+                    for m in missing:
+                        notes.setdefault(m, {"reason": "eva: zero value (route is no better "
+                                                       "than the current plan)", "gap": gap})
+                    continue
+                for m in missing:
+                    notes.setdefault(m, {"reason": "eva: pruned (gap <= cost)", "gap": gap})
+                if gap <= self.cost:
+                    continue
+                if left is not None and len(missing) > left:
+                    for m in missing:
+                        if notes[m]["reason"].startswith("eva: pruned"):
+                            notes[m]["reason"] = "eva: pruned (question budget)"
+                    continue
+                ests = sorted(((est(m).p_lower, m) for m in missing))
+                p_all, reach, e_q = 1.0, 1.0, 0.0
+                for p_low, _ in ests:
+                    e_q += reach
+                    reach *= p_low
+                p_all = reach
+                value = p_all * gap - self.cost * e_q
+                for m in missing:
+                    e = est(m)
+                    notes[m].update({"reason": f"eva: not worth asking (value {value:.3f})",
+                                     "gap": gap, "p": e.p, "p_lower": e.p_lower,
+                                     "p_source": e.source, "route_value": round(value, 6)})
+                key = (-value, len(missing), order[route["id"]])
+                if value > 0 and (best is None or key < best[0]):
+                    best = (key, route, [m for _, m in ests], value, gap)
+            if best is None:
+                break
+            _, route, ask_order, value, gap = best
+            for atom_id in ask_order:
+                yes = ask(atom_id, f"eva: route {route['id']} value {value:.3f} "
+                                   f"(gap {gap}, cost {self.cost})")
+                asked += 1
+                if not yes:
+                    refused.add(atom_id)
+                    break
+                granted.add(atom_id)
+        for n in notes.values():
+            n["model_calls_total"] = model_calls
+        return notes
+
+
+class UncertaintyThresholdPolicy(RoutePolicy):
+    """Baseline: ask about every unresolved atom whose P(grant) is uncertain
+    (|p - 0.5| < threshold), ignoring how much the answer would change."""
+
+    name = "uncertainty"
+
+    def __init__(self, threshold: float = 0.3, model: Optional[PreferenceModel] = None):
+        self.threshold = threshold
+        self.model = model or HintOrPriorModel()
+
+    def decide(self, block, ask):
+        notes = {}
+        for atom_id in unresolved(block):
+            e = self.model.estimate(block, atom_id)
+            details = {"p": e.p, "p_source": e.source}
+            if abs(e.p - 0.5) < self.threshold:
+                ask(atom_id, f"uncertainty: |p - 0.5| = {abs(e.p - 0.5):.2f} < {self.threshold}")
+                notes[atom_id] = details
+            else:
+                notes[atom_id] = {"reason": f"uncertainty: confident (p = {e.p})", **details}
+        return notes
+
+
 POLICIES: Dict[str, RoutePolicy] = {p.name: p for p in (NoAskPolicy(), AskAllPolicy(), OraclePolicy())}
+PARAMETRISED = ("eva", "uncertainty")
+
+
+def build_policy(name: str, settings: Optional[Dict[str, Any]] = None) -> RoutePolicy:
+    """Build a route policy; ``settings`` may hold cost, budget, prior, margin, threshold."""
+    s = settings or {}
+    model = HintOrPriorModel(prior=float(s.get("prior", 0.5)), margin=float(s.get("margin", 0.1)))
+    if name == "eva":
+        budget = s.get("budget")
+        return EVAPolicy(cost=float(s.get("cost", 0.1)),
+                         budget=None if budget in (None, "") else int(budget), model=model)
+    if name == "uncertainty":
+        return UncertaintyThresholdPolicy(threshold=float(s.get("threshold", 0.3)), model=model)
+    if name in POLICIES:
+        return POLICIES[name]
+    raise ValueError(f"unknown route policy {name!r}")
 
 
 # ---- controller -------------------------------------------------------------------------
@@ -127,6 +301,7 @@ class AtomDecision:
     asked: bool = False
     answer: Optional[bool] = None
     reason: str = "not asked"
+    details: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -171,7 +346,15 @@ def run_controller(block: Block, policy: RoutePolicy, answer: AnswerFn) -> Contr
             granted.append(atom_id)
         return yes
 
-    policy.decide(block, ask)
+    notes = policy.decide(block, ask) or {}
+    for atom_id, note in notes.items():
+        if atom_id not in decisions:
+            continue
+        note = dict(note)
+        reason = note.pop("reason", None)
+        if reason and not decisions[atom_id].asked:
+            decisions[atom_id].reason = reason
+        decisions[atom_id].details.update(note)
     return ControllerResult(policy.name, questions, granted, choose_route(block, granted),
                             list(decisions.values()))
 

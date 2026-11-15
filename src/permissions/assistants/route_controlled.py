@@ -33,3 +33,15 @@ class RouteOraclePermissionAssistant(RouteControlledPermissionAssistant):
     """Knows the user's answers; asks the fewest questions for the best route."""
 
     route_policy = "oracle"
+
+
+class RouteEVAPermissionAssistant(RouteControlledPermissionAssistant):
+    """PERMIT EVA: asks only when a route's expected gain beats the cost of asking."""
+
+    route_policy = "eva"
+
+
+class RouteUncertaintyPermissionAssistant(RouteControlledPermissionAssistant):
+    """Baseline: asks whenever P(grant) is uncertain, regardless of route gain."""
+
+    route_policy = "uncertainty"

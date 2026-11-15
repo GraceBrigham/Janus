@@ -135,6 +135,7 @@ class RunnerHookTest(unittest.TestCase):
         from src.scripts.subscenario_runner import SubscenarioRunner
 
         r = SubscenarioRunner.__new__(SubscenarioRunner)  # skip __init__ (it builds the judge)
+        r.args = SimpleNamespace(permit_settings={})
         from src.utils.metrics import RunMetrics
         r.metrics = RunMetrics()
         r.permission_mgr = PermissionManager(None, assistant_name=assistant, metrics=r.metrics)
