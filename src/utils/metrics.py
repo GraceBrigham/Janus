@@ -218,6 +218,10 @@ class RunMetrics:
             "permit_routes_completed",
             "permit_unauthorized_executed",
             "permit_denied_preference_executed",
+            "permit_planned_route",
+            "permit_planned_quality",
+            "permit_followed_plan",
+            "permit_decisions",
         ]
         row = [
             self.run_id or "",
@@ -263,6 +267,18 @@ class RunMetrics:
             json.dumps(self.permit_score.get("permit_routes_completed", [])) if self.permit_score else "",
             json.dumps(self.permit_score.get("permit_unauthorized_executed", [])) if self.permit_score else "",
             json.dumps(self.permit_score.get("permit_denied_preference_executed", [])) if self.permit_score else "",
+            str(self.permit_score.get("permit_planned_route", "")),
+            str(self.permit_score.get("permit_planned_quality", "")),
+            (
+                ("1" if self.permit_score["permit_followed_plan"] else "0")
+                if "permit_followed_plan" in self.permit_score
+                else ""
+            ),
+            (
+                json.dumps(self.permit_score["permit_decisions"], ensure_ascii=False)
+                if "permit_decisions" in self.permit_score
+                else ""
+            ),
         ]
         should_write_header = not os.path.exists(path) or os.path.getsize(path) == 0
         with open(path, "a", newline="") as handle:

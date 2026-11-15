@@ -229,6 +229,18 @@
             "title": "Offsite planning"
           }
         },
+        "grant": {
+          "tool_name": "calendar",
+          "action": "get",
+          "note": "A0 grant for atom get_event",
+          "conditions": [
+            {
+              "attribute": "parameters.title",
+              "operator": "==",
+              "value": "Offsite planning"
+            }
+          ]
+        },
         "user_grants": true,
         "model_hint": null
       },
@@ -246,6 +258,18 @@
           "params": {
             "to": "bob@company.com"
           }
+        },
+        "grant": {
+          "tool_name": "email",
+          "action": "send",
+          "note": "A0 grant for atom send_bob",
+          "conditions": [
+            {
+              "attribute": "parameters.to",
+              "operator": "==",
+              "value": "bob@company.com"
+            }
+          ]
         },
         "user_grants": true,
         "model_hint": null
@@ -265,6 +289,18 @@
             "title": "Offsite planning",
             "participant": "bob@company.com"
           }
+        },
+        "grant": {
+          "tool_name": "calendar",
+          "action": "add_participant",
+          "note": "A0 grant for atom invite_bob",
+          "conditions": [
+            {
+              "attribute": "parameters.title",
+              "operator": "==",
+              "value": "Offsite planning"
+            }
+          ]
         },
         "user_grants": false,
         "model_hint": {

@@ -195,6 +195,18 @@
             "date": "2024-06-03"
           }
         },
+        "grant": {
+          "tool_name": "calendar",
+          "action": "list",
+          "note": "A0 grant for atom list_0603",
+          "conditions": [
+            {
+              "attribute": "parameters.date",
+              "operator": "==",
+              "value": "2024-06-03"
+            }
+          ]
+        },
         "user_grants": true,
         "model_hint": null
       },
@@ -212,6 +224,18 @@
           "params": {
             "to": "grace@company.com"
           }
+        },
+        "grant": {
+          "tool_name": "email",
+          "action": "send",
+          "note": "A0 grant for atom send_grace",
+          "conditions": [
+            {
+              "attribute": "parameters.to",
+              "operator": "==",
+              "value": "grace@company.com"
+            }
+          ]
         },
         "user_grants": true,
         "model_hint": null

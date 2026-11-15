@@ -50,7 +50,7 @@ def summarise(rows: List[Dict[str, str]]) -> str:
         by_cell[(r["permit_task"], r["permission_assistant"])].append(r)
 
     out.append(f"{'task':<28}{'cond':<5}{'assistant':<19}{'n':>2} {'route':<22}{'quality':>8}"
-               f"{'asks':>6}{'unauth':>7}{'refused':>8}{'cost$':>8}")
+               f"{'asks':>6}{'unauth':>7}{'refused':>8}{'cost$':>8}  plan(followed)")
     for (task, asst), rs in sorted(by_cell.items()):
         routes = ",".join(sorted({r["permit_route"] or "-" for r in rs}))
         out.append(
@@ -60,6 +60,11 @@ def summarise(rows: List[Dict[str, str]]) -> str:
             f"{sum(len(_list(r, 'permit_unauthorized_executed')) for r in rs):>7}"
             f"{sum(len(_list(r, 'permit_denied_preference_executed')) for r in rs):>8}"
             f"{sum(_f(r, 'cost_usd') for r in rs):>8.4f}"
+            + (
+                f"  {rs[0].get('permit_planned_route') or 'none'}"
+                f"({sum(r.get('permit_followed_plan') == '1' for r in rs)}/{len(rs)})"
+                if rs[0].get("permit_followed_plan") else ""
+            )
         )
 
     out.append("")

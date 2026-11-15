@@ -22,7 +22,9 @@ from rich.markup import escape
 
 from src.agent import create_agent
 from src.utils import usage_tracker
+from dataclasses import asdict
 from src.permit.fixtures import score_run
+from src.permit.routes import POLICIES as ROUTE_POLICIES, render_plan, run_controller, truth_answer
 from src.permit.grants import install_grants, load_grants, parse_grants
 from src.utils.model_config import make_model
 from src.utils.metrics import RunMetrics
@@ -123,6 +125,10 @@ class GoalEvalResult:
     details: List[str]
 
 
+def _route_controller_grants(block: dict, granted: list) -> list:
+    return parse_grants({"grants": [block["atoms"][a]["grant"] for a in granted]})
+
+
 def _read_permit_block(path) -> Optional[dict]:
     """Return the PERMIT fixture block of a compiled scenario file, if any."""
     try:
@@ -204,6 +210,8 @@ class SubscenarioRunner:
         self._latest_agent_response: str = ""
         self._pending_abort: bool = False
         self.permit_block: Optional[dict] = None
+        self.route_result = None
+        self.permit_plan_text: str = ""
 
     async def run(self) -> int:
         await self.session_service.create_session(
@@ -231,6 +239,12 @@ class SubscenarioRunner:
                 f"PERMIT task {self.permit_block['task_id']} ({self.permit_block['condition']}): "
                 f"installed {len(installed)} A0 grant(s): " + ", ".join(p.name for p in installed)
             )
+        route_policy = getattr(self.permission_mgr.assistant, "route_policy", "")
+        if route_policy:
+            if not self.permit_block:
+                print("[red]Route-controlled assistants need a PERMIT fixture (--scenarios permit).[/red]")
+                return 1
+            self._run_route_controller(route_policy)
 
         scenario_data_set = f"scenario_{self.args.scenario}/{self.args.subscenario}"
         set_active_data_set(scenario_data_set)
@@ -295,6 +309,17 @@ class SubscenarioRunner:
                 for r in self.tool_call_evaluator.records
             ]
             permit_score = score_run(self.permit_block, executed)
+            if self.route_result is not None:
+                planned = self.route_result.route["id"] if self.route_result.route else ""
+                permit_score.update({
+                    "permit_planned_route": planned,
+                    "permit_planned_quality": self.route_result.planned_quality,
+                    "permit_followed_plan": (
+                        planned in permit_score["permit_routes_completed"]
+                        if planned else not permit_score["permit_routes_completed"]
+                    ),
+                    "permit_decisions": self.route_result.to_dict()["decisions"],
+                })
             self.metrics.set_permit_score(permit_score)
             run_logger.log("PERMIT score: " + json.dumps(permit_score, sort_keys=True))
             print(f"[blue]PERMIT score: {permit_score}[/blue]")
@@ -312,6 +337,25 @@ class SubscenarioRunner:
             self.metrics.write_csv(str(metrics_file))
         return 0
 
+    def _run_route_controller(self, policy_name: str) -> None:
+        """PERMIT route layer: ask up front, grant yes-answers, plan the route."""
+        block = self.permit_block
+        result = run_controller(block, ROUTE_POLICIES[policy_name], truth_answer(block))
+        for atom_id in result.questions:
+            self.metrics.increment_permission_assistant()
+            self.metrics.increment_user()
+        installed = install_grants(self.permission_mgr, _route_controller_grants(block, result.granted))
+        self.route_result = result
+        self.permit_plan_text = render_plan(block, result)
+        for d in result.decisions:
+            run_logger.log("PERMIT_DECISION " + json.dumps(asdict(d), sort_keys=True))
+        run_logger.log(
+            f"PERMIT route controller ({policy_name}): asked {result.questions}, "
+            f"granted {result.granted} ({len(installed)} grant(s)), planned route "
+            f"{result.route['id'] if result.route else 'none'} (quality {result.planned_quality})"
+        )
+        run_logger.log("PERMIT plan:\n" + self.permit_plan_text)
+
     async def _run_goal_loop(self, runner: Runner) -> None:
         total = len(self.goals)
         for idx, goal in enumerate(self.goals, start=1):
@@ -325,6 +369,8 @@ class SubscenarioRunner:
             run_logger.log(f"GOAL {goal.id} START: {goal.user_goal}")
 
             current_user_message = goal.user_goal
+            if self.permit_plan_text and idx == 1:
+                current_user_message = f"{goal.user_goal}\n\n{self.permit_plan_text}"
             follow_up_count = 0
             agent_outputs: List[str] = []
             while True:

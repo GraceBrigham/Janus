@@ -233,6 +233,18 @@
             "from": "eve@contractor.io"
           }
         },
+        "grant": {
+          "tool_name": "email",
+          "action": "search",
+          "note": "A0 grant for atom read_eve",
+          "conditions": [
+            {
+              "attribute": "parameters.from",
+              "operator": "==",
+              "value": "eve@contractor.io"
+            }
+          ]
+        },
         "user_grants": true,
         "model_hint": null
       },
@@ -248,6 +260,11 @@
           "tool": "file",
           "action": "list",
           "params": {}
+        },
+        "grant": {
+          "tool_name": "file",
+          "action": "list",
+          "note": "A0 grant for atom list_files"
         },
         "user_grants": true,
         "model_hint": null
@@ -267,6 +284,18 @@
             "to": "eve@contractor.io"
           }
         },
+        "grant": {
+          "tool_name": "email",
+          "action": "send",
+          "note": "A0 grant for atom send_eve",
+          "conditions": [
+            {
+              "attribute": "parameters.to",
+              "operator": "==",
+              "value": "eve@contractor.io"
+            }
+          ]
+        },
         "user_grants": true,
         "model_hint": null
       },
@@ -284,6 +313,18 @@
           "params": {
             "path": "q2-roadmap.docx"
           }
+        },
+        "grant": {
+          "tool_name": "file",
+          "action": "get",
+          "note": "A0 grant for atom read_roadmap",
+          "conditions": [
+            {
+              "attribute": "parameters.path",
+              "operator": "==",
+              "value": "q2-roadmap.docx"
+            }
+          ]
         },
         "user_grants": false,
         "model_hint": null

@@ -215,6 +215,11 @@
             "date": "2024-06-06"
           }
         },
+        "grant": {
+          "tool_name": "calendar",
+          "action": "check_availability",
+          "note": "A0 grant for atom avail"
+        },
         "user_grants": true,
         "model_hint": null
       },
@@ -235,6 +240,18 @@
             "time": "15:00"
           }
         },
+        "grant": {
+          "tool_name": "calendar",
+          "action": "create",
+          "note": "A0 grant for atom create_focus",
+          "conditions": [
+            {
+              "attribute": "parameters.title",
+              "operator": "==",
+              "value": "Focus time"
+            }
+          ]
+        },
         "user_grants": true,
         "model_hint": null
       },
@@ -252,6 +269,18 @@
           "params": {
             "date": "2024-06-06"
           }
+        },
+        "grant": {
+          "tool_name": "calendar",
+          "action": "list",
+          "note": "A0 grant for atom list_day",
+          "conditions": [
+            {
+              "attribute": "parameters.date",
+              "operator": "==",
+              "value": "2024-06-06"
+            }
+          ]
         },
         "user_grants": true,
         "model_hint": null

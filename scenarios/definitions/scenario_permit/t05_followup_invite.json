@@ -227,6 +227,18 @@
             "date": "2024-06-07"
           }
         },
+        "grant": {
+          "tool_name": "calendar",
+          "action": "create",
+          "note": "A0 grant for atom create_alone",
+          "conditions": [
+            {
+              "attribute": "parameters.title",
+              "operator": "==",
+              "value": "Roadmap follow-up"
+            }
+          ]
+        },
         "user_grants": true,
         "model_hint": null
       },
@@ -251,6 +263,18 @@
             ]
           }
         },
+        "grant": {
+          "tool_name": "calendar",
+          "action": "create",
+          "note": "A0 grant for atom create_full",
+          "conditions": [
+            {
+              "attribute": "parameters.title",
+              "operator": "==",
+              "value": "Roadmap follow-up"
+            }
+          ]
+        },
         "user_grants": true,
         "model_hint": null
       },
@@ -269,6 +293,18 @@
             "title": "Introductory meeting"
           }
         },
+        "grant": {
+          "tool_name": "calendar",
+          "action": "get",
+          "note": "A0 grant for atom get_intro",
+          "conditions": [
+            {
+              "attribute": "parameters.title",
+              "operator": "==",
+              "value": "Introductory meeting"
+            }
+          ]
+        },
         "user_grants": true,
         "model_hint": null
       },
@@ -286,6 +322,18 @@
           "params": {
             "date": "2024-06-03"
           }
+        },
+        "grant": {
+          "tool_name": "calendar",
+          "action": "list",
+          "note": "A0 grant for atom list_0603",
+          "conditions": [
+            {
+              "attribute": "parameters.date",
+              "operator": "==",
+              "value": "2024-06-03"
+            }
+          ]
         },
         "user_grants": true,
         "model_hint": null

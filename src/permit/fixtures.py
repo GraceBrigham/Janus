@@ -250,6 +250,7 @@ def compile_task(task: Task, data: Dict[str, Any]) -> Dict[str, Any]:
             "condition": task.condition,
             "grants": [_grant_dict(task.atoms[a].grant, a) for a in task.authorized],
             "atoms": {a.id: {"tuple": a.tuple, "match": _pattern(a),
+                             "grant": _grant_dict(a.grant, a.id),
                              "user_grants": a.user_grants, "model_hint": a.model_hint}
                       for a in task.atoms.values()},
             "authorized": task.authorized,

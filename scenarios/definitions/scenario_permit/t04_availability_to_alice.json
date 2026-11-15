@@ -233,6 +233,18 @@
             "from": "alice@company.com"
           }
         },
+        "grant": {
+          "tool_name": "email",
+          "action": "search",
+          "note": "A0 grant for atom read_alice",
+          "conditions": [
+            {
+              "attribute": "parameters.from",
+              "operator": "==",
+              "value": "alice@company.com"
+            }
+          ]
+        },
         "user_grants": true,
         "model_hint": null
       },
@@ -248,6 +260,11 @@
           "tool": "calendar",
           "action": "check_availability",
           "params": {}
+        },
+        "grant": {
+          "tool_name": "calendar",
+          "action": "check_availability",
+          "note": "A0 grant for atom avail"
         },
         "user_grants": true,
         "model_hint": null
@@ -266,6 +283,18 @@
           "params": {
             "to": "alice@company.com"
           }
+        },
+        "grant": {
+          "tool_name": "email",
+          "action": "send",
+          "note": "A0 grant for atom send_alice",
+          "conditions": [
+            {
+              "attribute": "parameters.to",
+              "operator": "==",
+              "value": "alice@company.com"
+            }
+          ]
         },
         "user_grants": true,
         "model_hint": null
@@ -292,6 +321,24 @@
               ]
             }
           }
+        },
+        "grant": {
+          "tool_name": "calendar",
+          "action": "list",
+          "note": "A0 grant for atom list_week",
+          "conditions": [
+            {
+              "attribute": "parameters.date",
+              "operator": "in",
+              "value": [
+                "2024-06-03",
+                "2024-06-04",
+                "2024-06-05",
+                "2024-06-06",
+                "2024-06-07"
+              ]
+            }
+          ]
         },
         "user_grants": true,
         "model_hint": null
