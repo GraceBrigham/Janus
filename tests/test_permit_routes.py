@@ -123,6 +123,13 @@ class PlanTextTest(unittest.TestCase):
         self.assertIn("calendar.get with title 'Introductory meeting'", text)
         self.assertNotIn("only partly", text)
 
+    def test_plan_never_reveals_data_a_step_must_fetch(self):
+        b, r = run("t05_followup_invite", "oracle")
+        text = rt.render_plan(b, r)
+        for email in ("alice@company.com", "bob@company.com", "sarah.baker@company.com"):
+            self.assertNotIn(email, text)
+        self.assertIn("participants as found in the earlier steps", text)
+
     def test_no_route_says_do_not_call_tools(self):
         b, r = run("t08_meetings_to_manager", "no_ask")
         self.assertIn("Do not call any tools", rt.render_plan(b, r))

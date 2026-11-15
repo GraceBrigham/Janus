@@ -389,9 +389,21 @@ def _describe_value(value: Any) -> str:
 
 
 def describe_step(block: Block, atom_id: str) -> str:
+    """Describe one plan step without revealing data an earlier step must fetch.
+
+    Scoring patterns can contain values the agent is supposed to *obtain*
+    (e.g. an attendee list read from another event). List-valued arguments are
+    therefore never printed; the step says to use what earlier steps found.
+    """
     match = block["atoms"][atom_id]["match"]
     params = match.get("params") or {}
-    args = ", ".join(f"{k} {_describe_value(v)}" for k, v in params.items())
+    parts = []
+    for k, v in params.items():
+        if isinstance(v, list):
+            parts.append(f"{k} as found in the earlier steps")
+        else:
+            parts.append(f"{k} {_describe_value(v)}")
+    args = ", ".join(parts)
     return f"{match['tool']}.{match['action']}" + (f" with {args}" if args else " (any arguments)")
 
 

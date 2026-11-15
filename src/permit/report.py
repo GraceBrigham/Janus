@@ -108,11 +108,11 @@ def summarise(rows: List[Dict[str, str]]) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Summarise PERMIT fixture runs")
-    parser.add_argument("output_dir")
+    parser.add_argument("output_dirs", nargs="+", help="One or more harness output directories.")
     args = parser.parse_args()
-    rows = load_rows(args.output_dir)
+    rows = [r for d in args.output_dirs for r in load_rows(d)]
     if not rows:
-        print(f"No PERMIT runs found under {args.output_dir}/metrics/")
+        print(f"No PERMIT runs found under {args.output_dirs}")
         return 1
     print(summarise(rows))
     return 0
