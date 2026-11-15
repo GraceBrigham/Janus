@@ -8,6 +8,7 @@ import json
 import re
 
 from google.adk.models.lite_llm import LiteLlm
+from src.utils.model_config import make_model
 from google.adk.models.llm_request import LlmRequest
 from google.genai import types
 
@@ -100,7 +101,7 @@ Respond with JSON only: {{"decision": "approve" or "escalate", "reasoning": "one
                 "ConstitutionPermissionAssistant requires --constitution-file to be set."
             )
         self.constitution_file = constitution_file
-        self.model = LiteLlm(model="openai/o3-mini")
+        self.model = make_model("assistant")
         self._latest_user_message: str = ""
         self._compiled_rules: Optional[List[Dict[str, Any]]] = None
         self._use_auto_approve: bool = constitution_use_auto_approve

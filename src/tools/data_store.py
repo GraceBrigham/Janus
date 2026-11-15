@@ -120,3 +120,20 @@ def get_collection(name: str) -> List[Dict[str, Any]]:
 
 def get_active_data_set() -> str:
     return _DATA_STORE.active_set
+
+
+def reset_tool_state() -> None:
+    """Drop the tool modules' cached collections (PERMIT fix).
+
+    calendar_tools, email_tools and file_tools cache their collection in a
+    module global the first time it is used and never refresh it. Without
+    this reset, every later run in the same process sees the first run's data
+    plus all changes earlier runs made. Call after activating a run's data set.
+    """
+    from src.tools import calendar_tools, email_tools, file_tools
+
+    calendar_tools.calendar_events = None
+    calendar_tools.last_event_id = None
+    email_tools.emails = None
+    file_tools.files = None
+    _DATA_STORE._cache.clear()

@@ -21,6 +21,13 @@ from rich import print
 from rich.markup import escape
 
 from src.agent import create_agent
+from src.utils import usage_tracker
+from dataclasses import asdict
+from src.permit.fixtures import score_run
+from src.permit import replay as permit_replay
+from src.permit.routes import build_policy as build_route_policy, render_plan, run_controller, truth_answer
+from src.permit.grants import install_grants, load_grants, parse_grants
+from src.utils.model_config import make_model
 from src.utils.metrics import RunMetrics
 from src.permissions.permission_manager import PermissionManager
 from src.scripts.runner_common import (
@@ -35,7 +42,7 @@ from src.utils.tool_call_evaluator import (
     load_tool_call_evaluator_from_config,
     OutputCriterion,
 )
-from src.tools.data_store import set_active_data_set, set_inline_data_set
+from src.tools.data_store import reset_tool_state, set_active_data_set, set_inline_data_set
 from src.utils.scenario_definitions import load_combined_definition
 from src.utils import run_logger
 
@@ -119,6 +126,20 @@ class GoalEvalResult:
     details: List[str]
 
 
+def _route_controller_grants(block: dict, granted: list) -> list:
+    return parse_grants({"grants": [block["atoms"][a]["grant"] for a in granted]})
+
+
+def _read_permit_block(path) -> Optional[dict]:
+    """Return the PERMIT fixture block of a compiled scenario file, if any."""
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            block = json.load(handle).get("permit")
+    except (OSError, ValueError, AttributeError):
+        return None
+    return block if isinstance(block, dict) else None
+
+
 class SubscenarioRunner:
     def __init__(self, args: argparse.Namespace):
         self.args = args
@@ -168,7 +189,15 @@ class SubscenarioRunner:
             constitution_file=args.constitution_file,
             constitution_use_auto_approve=not args.no_constitution_auto_approve,
         )
-        self.judge_model = LiteLlm(model=args.judge_model)
+        grants_file = getattr(args, "grants_file", None)
+        if grants_file:
+            installed = install_grants(self.permission_mgr, load_grants(grants_file))
+            run_logger.log(
+                f"PERMIT: installed {len(installed)} grant(s) from {grants_file}: "
+                + ", ".join(p.name for p in installed)
+            )
+        self.judge_model = make_model("judge", args.judge_model)
+        usage_tracker.reset()
         if self.synthetic_responder_enabled:
             self.permission_mgr.set_prompt_hooks(
                 ask_hook=self._synthetic_permission_prompt,
@@ -181,6 +210,10 @@ class SubscenarioRunner:
         self._active_goal: Optional[EvalGoal] = None
         self._latest_agent_response: str = ""
         self._pending_abort: bool = False
+        self.permit_block: Optional[dict] = None
+        self.route_result = None
+        self.permit_profile: Optional[dict] = None
+        self.permit_plan_text: str = ""
 
     async def run(self) -> int:
         await self.session_service.create_session(
@@ -199,9 +232,29 @@ class SubscenarioRunner:
             )
             return 1
 
+        self.permit_block = _read_permit_block(combined_definition.path)
+        if not self._apply_permit_persona(combined_definition):
+            return 1
+        if self.permit_block:
+            installed = install_grants(
+                self.permission_mgr, parse_grants({"grants": self.permit_block["grants"]})
+            )
+            run_logger.log(
+                f"PERMIT task {self.permit_block['task_id']} ({self.permit_block['condition']}): "
+                f"installed {len(installed)} A0 grant(s): " + ", ".join(p.name for p in installed)
+            )
+        route_policy = getattr(self.permission_mgr.assistant, "route_policy", "")
+        if route_policy:
+            if not self.permit_block:
+                print("[red]Route-controlled assistants need a PERMIT fixture (--scenarios permit).[/red]")
+                return 1
+            self._run_route_controller(route_policy)
+
         scenario_data_set = f"scenario_{self.args.scenario}/{self.args.subscenario}"
         set_active_data_set(scenario_data_set)
         set_inline_data_set(scenario_data_set, combined_definition.data)
+        # Fresh tool state per run (Janus otherwise leaks data between runs).
+        reset_tool_state()
         self.metrics.set_scenario_metadata(
             total_potential_desired_tool_calls=combined_definition.metadata.get(
                 "total_potential_desired_tool_calls"
@@ -254,6 +307,32 @@ class SubscenarioRunner:
         tool_summary = self.tool_call_evaluator.summary()
         self.metrics.set_evaluation_data(output_results=goal_data)
 
+        if self.permit_block:
+            executed = [
+                {"tool": r.tool, "action": r.action, "args": r.args}
+                for r in self.tool_call_evaluator.records
+            ]
+            permit_score = score_run(self.permit_block, executed)
+            permit_score["permit_user"] = (self.permit_block.get("persona") or {}).get("user", "")
+            if self.route_result is not None:
+                planned = self.route_result.route["id"] if self.route_result.route else ""
+                permit_score.update({
+                    "permit_planned_route": planned,
+                    "permit_planned_quality": self.route_result.planned_quality,
+                    "permit_followed_plan": (
+                        planned in permit_score["permit_routes_completed"]
+                        if planned else not permit_score["permit_routes_completed"]
+                    ),
+                    "permit_decisions": self.route_result.to_dict()["decisions"],
+                })
+            self.metrics.set_permit_score(permit_score)
+            run_logger.log("PERMIT score: " + json.dumps(permit_score, sort_keys=True))
+            print(f"[blue]PERMIT score: {permit_score}[/blue]")
+        usage = usage_tracker.snapshot()
+        self.metrics.set_llm_usage(usage)
+        usage_text = usage_tracker.format_summary(usage)
+        print(f"[blue]{usage_text}[/blue]")
+        run_logger.log(usage_text)
         summary_text = self.metrics.summary()
         print(f"\n[blue]{summary_text}[/blue]")
         run_logger.log("Run summary:\n" + summary_text)
@@ -262,6 +341,59 @@ class SubscenarioRunner:
             metrics_file.parent.mkdir(parents=True, exist_ok=True)
             self.metrics.write_csv(str(metrics_file))
         return 0
+
+    def _apply_permit_persona(self, combined_definition) -> bool:
+        """--permit-users: make a held-out Wu et al. participant the user of this task."""
+        permit_user = getattr(self.args, "permit_user", None)
+        if not permit_user:
+            return True
+        if not self.permit_block:
+            print("[red]--permit-users needs a PERMIT fixture (--scenarios permit).[/red]")
+            return False
+        self._permit_trained = permit_replay.trained(getattr(self.args, "permit_split_seed", 0))
+        if permit_user not in self._permit_trained.split["test"]:
+            print(f"[red]{permit_user} is not a held-out test participant.[/red]")
+            return False
+        self._permit_mapping = permit_replay.load_mapping()
+        made = permit_replay.persona(self._permit_trained, self.permit_block,
+                                     self._permit_mapping, permit_user)
+        if made is None:
+            print(f"[red]Participant {permit_user} cannot be replayed on this task.[/red]")
+            return False
+        self.permit_block, self.permit_profile = made
+        # Janus's alignment_aware responder refuses exactly this participant's "no" answers.
+        denied = [spec["match"] for spec in self.permit_block["atoms"].values()
+                  if not spec["user_grants"]]
+        combined_definition.eval_config["out_of_alignment_calls"] = denied
+        combined_definition.metadata["total_potential_out_of_alignment_tool_calls"] = len(denied)
+        run_logger.log("PERMIT persona: " + json.dumps(self.permit_block["persona"], sort_keys=True))
+        return True
+
+    def _run_route_controller(self, policy_name: str) -> None:
+        """PERMIT route layer: ask up front, grant yes-answers, plan the route."""
+        block = self.permit_block
+        settings = getattr(self.args, "permit_settings", None) or {}
+        model = None
+        if getattr(self, "permit_profile", None) is not None:
+            model = permit_replay.WuPreferenceModel(self._permit_trained, self.permit_profile,
+                                                    self._permit_mapping)
+        result = run_controller(block, build_route_policy(policy_name, settings, model=model),
+                                truth_answer(block))
+        run_logger.log("PERMIT policy settings: " + json.dumps(settings, sort_keys=True))
+        for atom_id in result.questions:
+            self.metrics.increment_permission_assistant()
+            self.metrics.increment_user()
+        installed = install_grants(self.permission_mgr, _route_controller_grants(block, result.granted))
+        self.route_result = result
+        self.permit_plan_text = render_plan(block, result)
+        for d in result.decisions:
+            run_logger.log("PERMIT_DECISION " + json.dumps(asdict(d), sort_keys=True))
+        run_logger.log(
+            f"PERMIT route controller ({policy_name}): asked {result.questions}, "
+            f"granted {result.granted} ({len(installed)} grant(s)), planned route "
+            f"{result.route['id'] if result.route else 'none'} (quality {result.planned_quality})"
+        )
+        run_logger.log("PERMIT plan:\n" + self.permit_plan_text)
 
     async def _run_goal_loop(self, runner: Runner) -> None:
         total = len(self.goals)
@@ -276,6 +408,8 @@ class SubscenarioRunner:
             run_logger.log(f"GOAL {goal.id} START: {goal.user_goal}")
 
             current_user_message = goal.user_goal
+            if self.permit_plan_text and idx == 1:
+                current_user_message = f"{goal.user_goal}\n\n{self.permit_plan_text}"
             follow_up_count = 0
             agent_outputs: List[str] = []
             while True:

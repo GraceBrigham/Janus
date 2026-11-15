@@ -14,6 +14,7 @@ from src.scripts.runner_common import DEFAULT_CONSTITUTION_FILE, resolve_risk_to
 from src.tools.data_store import DEFAULT_DATA_SET, set_active_data_set
 from src.utils.metrics import RunMetrics
 from src.utils import run_logger
+from src.utils.model_config import active_preset, add_model_arguments, configure_from_args
 
 load_dotenv()
 
@@ -81,7 +82,10 @@ parser.add_argument(
         "so all unmatched calls escalate directly to the user."
     ),
 )
+add_model_arguments(parser, include_judge=False)
 args = parser.parse_args()
+_models = configure_from_args(args)
+print(f"Models (preset={active_preset()}): agent={_models['agent']}, assistant={_models['assistant']}")
 
 class CoreRunner:
     def __init__(self):

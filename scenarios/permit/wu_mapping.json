@@ -1,0 +1,18 @@
+{
+  "description": "Join between PERMIT fixture atoms and Wu et al. (IEEE S&P 2026) permission items, as '<app>,<data type>' keys from data/user_study.json task3 answers. Only unresolved atoms (those a policy might ask about) need a mapping. 'fit' is close when app and data type both match the atom, loose when one of them is a substitute. Wu et al. have no representation axis (full event vs free/busy) and no operation axis, so those parts of the five-tuple are not reflected. Data: CC BY 4.0, Wu, Yang, Roesner, Kohno, Zhang, Iqbal.",
+  "atoms": {
+    "t01_free_slot/list_day":            {"wu_item": "Calendar,Scheduling details", "fit": "close", "why": "agent reads one day's full calendar"},
+    "t02_tell_bob_time/invite_bob":      {"wu_item": "Calendar,Meeting agenda (i.e. cost-cutting)", "fit": "loose", "why": "a colleague gets the full event; nearest Wu item is sharing meeting details from Calendar"},
+    "t03_focus_block/list_day":          {"wu_item": "Calendar,Scheduling details", "fit": "close", "why": "agent reads one day's full calendar"},
+    "t04_availability_to_alice/list_week": {"wu_item": "Calendar,Scheduling details", "fit": "close", "why": "agent reads a week of full calendar entries"},
+    "t05_followup_invite/get_intro":     {"wu_item": "Email,Attendees email addresses", "fit": "loose", "why": "the needed data is the attendee list; Wu has it under Email, not Calendar"},
+    "t05_followup_invite/list_0603":     {"wu_item": "Calendar,Scheduling details", "fit": "close", "why": "agent reads one day's full calendar"},
+    "t06_roadmap_to_contractor/read_roadmap": {"wu_item": "Cloud Drive,Revenue report", "fit": "loose", "why": "a confidential business document from file storage; Wu has no roadmap item"},
+    "t07_add_frank/add_one":             {"wu_item": "Calendar,Meeting agenda (i.e. cost-cutting)", "fit": "close", "why": "a colleague is added to a budget meeting and sees its agenda"},
+    "t07_add_frank/add_list":            {"wu_item": "Calendar,Meeting agenda (i.e. cost-cutting)", "fit": "close", "why": "same as add_one"},
+    "t08_meetings_to_manager/list_0603": {"wu_item": "Calendar,Scheduling details", "fit": "close", "why": "agent reads one day's full calendar"},
+    "t08_meetings_to_manager/send_grace": {"wu_item": "Slack,Scheduling details (i.e.  meeting details)", "fit": "loose", "why": "meeting details go to the manager; Wu has this via Slack, not Email"},
+    "t09_free_slot_trap/list_day":       {"wu_item": "Calendar,Scheduling details", "fit": "close", "why": "agent reads one day's full calendar"},
+    "t10_offsite_time_trap/invite_bob":  {"wu_item": "Calendar,Meeting agenda (i.e. cost-cutting)", "fit": "loose", "why": "same as t02 invite_bob"}
+  }
+}

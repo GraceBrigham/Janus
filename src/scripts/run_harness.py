@@ -7,7 +7,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
+import subprocess
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Iterable, List
@@ -23,12 +26,28 @@ from src.scripts.subscenario_runner import (
     SubscenarioRunner,
 )
 from src.scripts.synthetic_responder import AVAILABLE_SYNTHETIC_RESPONDER_MODES
+from src.utils.model_config import active_preset, add_model_arguments, configure_from_args, resolved_models
 
 
-def _parse_csv_values(raw: str, allowed: Iterable[str], label: str) -> List[str]:
+PERMIT_SCENARIO = "permit"
+
+
+def _scenario_choices() -> List[str]:
+    return list(AVAILABLE_SCENARIOS) + [PERMIT_SCENARIO]
+
+
+def _subscenario_choices() -> List[str]:
+    from src.permit.fixtures import compiled_task_ids
+
+    return list(AVAILABLE_SUBSCENARIOS) + compiled_task_ids()
+
+
+def _parse_csv_values(
+    raw: str, allowed: Iterable[str], label: str, all_values: Iterable[str] | None = None
+) -> List[str]:
     allowed_values = list(allowed)
     if raw.strip().lower() == "all":
-        return allowed_values
+        return list(all_values) if all_values is not None else allowed_values
 
     selected: List[str] = []
     for item in raw.split(","):
@@ -82,6 +101,9 @@ def _build_single_run_args(
         permission_assistant_verbose=base_args.permission_assistant_verbose,
         agent_verbose=base_args.agent_verbose,
         policy_file=base_args.policy_file,
+        grants_file=base_args.grants_file,
+        permit_settings=_permit_settings(base_args),
+        permit_split_seed=getattr(base_args, "permit_split_seed", 0),
         task_assistant_risk_tolerance=risk_tolerance,
         synthetic_responder=True,
         synthetic_responder_mode=synthetic_responder_mode,
@@ -95,7 +117,28 @@ def _build_single_run_args(
     )
 
 
+def _permit_settings(args: argparse.Namespace) -> dict:
+    return {
+        "cost": args.permit_question_cost,
+        "budget": args.permit_question_budget,
+        "prior": args.permit_prior,
+        "margin": args.permit_margin,
+        "threshold": args.permit_uncertainty_threshold,
+    }
+
+
+def _definition_exists(scenario: str, subscenario: str) -> bool:
+    root = Path(__file__).resolve().parents[2]
+    return (root / "scenarios" / "definitions" / f"scenario_{scenario}" / f"{subscenario}.json").exists()
+
+
 def _expand_runs(args: argparse.Namespace) -> List[SimpleNamespace]:
+    skipped = [
+        f"{s}/{ss}" for s in args.scenarios for ss in args.subscenarios
+        if not _definition_exists(s, ss)
+    ]
+    if skipped:
+        print(f"Skipping {len(skipped)} scenario/subscenario pair(s) with no definition file.")
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -110,11 +153,14 @@ def _expand_runs(args: argparse.Namespace) -> List[SimpleNamespace]:
 
         for scenario in args.scenarios:
             for subscenario in args.subscenarios:
+                if not _definition_exists(scenario, subscenario):
+                    continue
+                users = _permit_users_for(args, scenario, subscenario)
                 for mode in responder_modes:
                     for risk_tolerance in assistant_risks:
-                        for _ in range(args.repetitions):
-                            runs.append(
-                                _build_single_run_args(
+                        for user in users:
+                            for _ in range(args.repetitions):
+                                run = _build_single_run_args(
                                     args,
                                     scenario=scenario,
                                     subscenario=subscenario,
@@ -123,8 +169,50 @@ def _expand_runs(args: argparse.Namespace) -> List[SimpleNamespace]:
                                     risk_tolerance=risk_tolerance,
                                     output_dir=output_dir,
                                 )
-                            )
+                                run.permit_user = user
+                                runs.append(run)
     return runs
+
+
+def _permit_users_for(args: argparse.Namespace, scenario: str, subscenario: str) -> List:
+    """Participants to replay for one PERMIT task: [None] means the fixture's own user.
+
+    --permit-users accepts 'test' (every eligible held-out participant), 'test:N'
+    (the first N eligible, sorted by id) or comma-separated participant ids.
+    Only test-split participants are allowed: train and calibration participants
+    shaped the predictor and its bound.
+    """
+    spec = (getattr(args, "permit_users", None) or "").strip()
+    if not spec or scenario != PERMIT_SCENARIO:
+        return [None]
+    import json as _json
+    from src.permit import replay as rp
+
+    tp = rp.trained(args.permit_split_seed)
+    path = Path(__file__).resolve().parents[2] / "scenarios" / "definitions" / f"scenario_{scenario}" / f"{subscenario}.json"
+    block = _json.loads(path.read_text())["permit"]
+    mapping = rp.load_mapping()
+    test = set(tp.split["test"])
+    eligible = rp.eligible_users(tp, block, mapping, list(test))
+    if spec == "test":
+        chosen = eligible
+    elif spec.startswith("test:"):
+        chosen = eligible[: int(spec.split(":", 1)[1])]
+    else:
+        ids = [u.strip() for u in spec.split(",") if u.strip()]
+        outside = [u for u in ids if u not in test]
+        if outside:
+            raise SystemExit(
+                f"--permit-users: {outside} are not test-split participants for split seed "
+                f"{args.permit_split_seed}; only held-out participants may be replayed."
+            )
+        chosen = [u for u in ids if u in eligible]
+        missing = sorted(set(ids) - set(chosen))
+        if missing:
+            print(f"{subscenario}: skipping {missing} (did not answer every mapped Wu item).")
+    if not chosen:
+        print(f"{subscenario}: no eligible participants; skipped.")
+    return chosen
 
 
 def parse_args() -> argparse.Namespace:
@@ -133,15 +221,24 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--scenarios",
-        type=lambda raw: _parse_csv_values(raw, AVAILABLE_SCENARIOS, "scenario"),
+        type=lambda raw: _parse_csv_values(
+            raw, _scenario_choices(), "scenario", all_values=AVAILABLE_SCENARIOS
+        ),
         default=list(AVAILABLE_SCENARIOS),
-        help="Comma-separated scenario IDs or 'all'. Default: all.",
+        help=(
+            "Comma-separated scenario IDs or 'all' (= the Janus scenarios 1,2,3). "
+            "Use 'permit' for the PERMIT route fixtures."
+        ),
     )
     parser.add_argument(
         "--subscenarios",
-        type=lambda raw: _parse_csv_values(raw, AVAILABLE_SUBSCENARIOS, "subscenario"),
+        type=lambda raw: _parse_csv_values(raw, _subscenario_choices(), "subscenario"),
         default=list(AVAILABLE_SUBSCENARIOS),
-        help="Comma-separated subscenarios or 'all'. Default: all.",
+        help=(
+            "Comma-separated subscenarios or 'all'. Default: the Janus subscenarios. "
+            "For --scenarios permit, use PERMIT task ids (or 'all'). "
+            "Scenario/subscenario pairs without a definition file are skipped."
+        ),
     )
     parser.add_argument(
         "--permission-assistants",
@@ -182,16 +279,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--permission-manager-verbose", action="store_true")
     parser.add_argument("--permission-assistant-verbose", action="store_true")
     parser.add_argument("--agent-verbose", action="store_true")
+    parser.add_argument("--permit-users", default=None,
+                        help="PERMIT: replay held-out Wu et al. participants as the user: 'test', "
+                             "'test:N' or comma-separated ids (default: the fixture's own user).")
+    parser.add_argument("--permit-split-seed", type=int, default=0,
+                        help="PERMIT: participant split seed for the predictor and --permit-users.")
+    parser.add_argument("--permit-question-cost", type=float, default=0.1,
+                        help="PERMIT route_eva: cost of one question, in route-quality units (default 0.1).")
+    parser.add_argument("--permit-question-budget", type=int, default=None,
+                        help="PERMIT route_eva: max questions per task (default: no cap).")
+    parser.add_argument("--permit-prior", type=float, default=0.5,
+                        help="PERMIT: P(grant) for atoms without a model hint (default 0.5).")
+    parser.add_argument("--permit-margin", type=float, default=0.1,
+                        help="PERMIT: lower bound = p - margin (placeholder for the conformal bound).")
+    parser.add_argument("--permit-uncertainty-threshold", type=float, default=0.3,
+                        help="PERMIT route_uncertainty: ask when |p - 0.5| < threshold (default 0.3).")
+    parser.add_argument(
+        "--grants-file",
+        default=None,
+        help="PERMIT: JSON file of explicit user grants, installed as in-memory PERMIT policies.",
+    )
     parser.add_argument(
         "--policy-file",
         default=None,
         help="Path to a policies.json file to load. If omitted, start with no policies.",
     )
-    parser.add_argument(
-        "--judge-model",
-        default="openai/o3-mini",
-        help="Model used to decide complete vs follow_up after each response.",
-    )
+    add_model_arguments(parser)
     parser.add_argument(
         "--max-followups",
         type=int,
@@ -213,7 +326,41 @@ def parse_args() -> argparse.Namespace:
     if args.repetitions < 1:
         parser.error("--repetitions must be at least 1.")
 
+    configure_from_args(args)
+
     return args
+
+
+def _git_commit() -> str:
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+        dirty = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=no"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        return commit + ("-dirty" if dirty else "")
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+
+
+def _write_run_config(args: argparse.Namespace, models: dict, total_runs: int) -> None:
+    """Record the models and settings of this harness invocation next to its outputs."""
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    config = {
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "git_commit": _git_commit(),
+        "model_preset": active_preset(),
+        "models": models,
+        "planned_runs": total_runs,
+        "args": {k: v for k, v in vars(args).items()},
+    }
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    path = output_dir / f"run_config_{stamp}.json"
+    path.write_text(json.dumps(config, indent=2, default=str) + "\n")
+    print(f"Run config written to {path}")
 
 
 async def _main() -> int:
@@ -221,7 +368,10 @@ async def _main() -> int:
     runs = _expand_runs(args)
     total_runs = len(runs)
 
+    models = resolved_models()
+    _write_run_config(args, models, total_runs)
     print(f"Planned {total_runs} harness run(s).")
+    print(f"Models (preset={active_preset()}): " + ", ".join(f"{k}={v}" for k, v in models.items()))
     for index, run_args in enumerate(runs, start=1):
         responder_mode = (
             run_args.synthetic_responder_mode if run_args.synthetic_responder else "disabled"
