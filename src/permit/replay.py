@@ -63,27 +63,60 @@ class Pair:
     profile: Dict[str, int]
 
 
+def persona(tp: pr.TrainedPredictor, block: Dict, mapping: Dict[str, Dict[str, str]],
+            user: str) -> Optional[Tuple[Dict, Dict[str, int]]]:
+    """Make ``user`` the simulated user of one task.
+
+    Returns (block with each unresolved atom's ``user_grants`` set to the
+    participant's recorded answer on its mapped Wu item and hints removed,
+    profile from every scenario that contains none of those items), or None if
+    an atom is unmapped or the participant never answered a mapped item.
+    """
+    task = block["task_id"]
+    items = {a: mapping.get(f"{task}/{a}", {}).get("wu_item") for a in rt.unresolved(block)}
+    if any(v is None for v in items.values()):
+        return None
+    answers = tp.users.get(user)
+    if not answers:
+        return None
+    by_item = {a.item: a.y for a in answers}
+    if not all(i in by_item for i in items.values()):
+        return None
+    held_queries = {a.query for a in answers if a.item in items.values()}
+    profile = {a.item: a.y for a in answers if a.query not in held_queries}
+    b = copy.deepcopy(block)
+    for atom_id, item in items.items():
+        b["atoms"][atom_id]["user_grants"] = bool(by_item[item])
+        b["atoms"][atom_id]["model_hint"] = None
+    b["persona"] = {"user": user, "split_seed": tp.seed,
+                    "answers": {a: bool(by_item[i]) for a, i in items.items()}}
+    return b, profile
+
+
+def eligible_users(tp: pr.TrainedPredictor, block: Dict, mapping: Dict[str, Dict[str, str]],
+                   users: List[str]) -> List[str]:
+    return [u for u in sorted(users) if persona(tp, block, mapping, u) is not None]
+
+
 def replay_pairs(tp: pr.TrainedPredictor, blocks: Dict[str, Dict],
                  mapping: Dict[str, Dict[str, str]], users: List[str]) -> List[Pair]:
     pairs = []
     for task, block in blocks.items():
-        atoms = rt.unresolved(block)
-        items = {a: mapping.get(f"{task}/{a}", {}).get("wu_item") for a in atoms}
-        if any(v is None for v in items.values()):
-            continue
         for user in users:
-            answers = tp.users[user]
-            by_item = {a.item: a.y for a in answers}
-            if not all(i in by_item for i in items.values()):
-                continue
-            held_queries = {a.query for a in answers if a.item in items.values()}
-            profile = {a.item: a.y for a in answers if a.query not in held_queries}
-            b = copy.deepcopy(block)
-            for atom_id, item in items.items():
-                b["atoms"][atom_id]["user_grants"] = bool(by_item[item])
-                b["atoms"][atom_id]["model_hint"] = None
-            pairs.append(Pair(task, user, b, profile))
+            made = persona(tp, block, mapping, user)
+            if made is not None:
+                pairs.append(Pair(task, user, made[0], made[1]))
     return pairs
+
+
+_TRAINED: Dict[int, pr.TrainedPredictor] = {}
+
+
+def trained(seed: int = 0) -> pr.TrainedPredictor:
+    """Fit once per process and split seed (about a second)."""
+    if seed not in _TRAINED:
+        _TRAINED[seed] = pr.train(seed)
+    return _TRAINED[seed]
 
 
 def policy_configs(costs: List[float]) -> List[Tuple[str, str, Dict, str]]:

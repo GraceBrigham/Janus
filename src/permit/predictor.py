@@ -372,8 +372,11 @@ class TrainedPredictor:
     seed: int
 
     def estimate(self, profile: Dict[str, int], item: str) -> Tuple[float, float]:
+        """(point estimate, lower bound). The bin bound can exceed the model's own
+        estimate when a bin's observed rate is above its predictions; the lower
+        bound is capped at the point estimate so it is never the less cautious one."""
         p = self.model.predict(profile, item)
-        return p, self.bound.lower(p)
+        return p, min(p, self.bound.lower(p))
 
 
 # Default alpha: the predictive bound under-covers at its nominal level because

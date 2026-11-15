@@ -71,10 +71,15 @@ class PredictorTest(unittest.TestCase):
         self.assertTrue(all(0.0 <= v <= 1.0 for v in p))
         self.assertGreater(pr.metrics(p, y)["auc"], pr.metrics(p0, y)["auc"])
 
-    def test_lower_bound_never_exceeds_point_estimate_much(self):
-        for p in np.linspace(0.01, 0.99, 25):
-            self.assertLessEqual(self.tp.bound.lower(float(p)), 1.0)
-            self.assertGreaterEqual(self.tp.bound.lower(float(p)), 0.0)
+    def test_estimate_lower_bound_never_exceeds_point_estimate(self):
+        users = self.tp.split["test"][:5]
+        items = sorted({a.item for u in users for a in self.tp.users[u]})[:40]
+        for u in users:
+            profile = {a.item: a.y for a in self.tp.users[u][:10]}
+            for item in items:
+                p, lower = self.tp.estimate(profile, item)
+                self.assertGreaterEqual(lower, 0.0)
+                self.assertLessEqual(lower, p)
 
 
 @unittest.skipUnless(HAVE_DATA, "Wu et al. data not found")
@@ -147,3 +152,81 @@ class ReplayTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(HAVE_DATA, "Wu et al. data not found")
+class HarnessPersonaTest(unittest.TestCase):
+    def _runs(self, *argv):
+        import sys
+        import tempfile
+        from src.scripts import run_harness as rh
+        with tempfile.TemporaryDirectory() as tmp:
+            old = sys.argv
+            sys.argv = ["run_harness", "--scenarios", "permit", *argv, "--output-dir", tmp,
+                        "--model-preset", "debug"]
+            try:
+                return rh._expand_runs(rh.parse_args())
+            finally:
+                sys.argv = old
+
+    def test_without_flag_the_fixture_user_is_used(self):
+        runs = self._runs("--subscenarios", "t04_availability_to_alice", "--permission-assistants", "route_eva")
+        self.assertEqual([r.permit_user for r in runs], [None])
+
+    def test_test_n_expands_over_eligible_held_out_participants(self):
+        tp = rp.trained(0)
+        runs = self._runs("--subscenarios", "t04_availability_to_alice,t08_meetings_to_manager",
+                          "--permission-assistants", "route_eva,route_no_ask", "--permit-users", "test:3")
+        t04 = [r for r in runs if r.subscenario == "t04_availability_to_alice"]
+        self.assertEqual(len(t04), 6)                     # 3 participants x 2 assistants
+        self.assertTrue(all(r.permit_user in tp.split["test"] for r in t04))
+        self.assertFalse([r for r in runs if r.subscenario == "t08_meetings_to_manager"])  # none eligible
+
+    def test_train_participants_are_refused(self):
+        tp = rp.trained(0)
+        with self.assertRaises(SystemExit):
+            self._runs("--subscenarios", "t04_availability_to_alice", "--permission-assistants", "route_eva",
+                       "--permit-users", tp.split["train"][0])
+
+    def _runner(self, user, task="t04_availability_to_alice", assistant="route_eva"):
+        from types import SimpleNamespace
+        from src.permissions.permission_manager import PermissionManager
+        from src.permit.grants import install_grants, parse_grants
+        from src.scripts.subscenario_runner import SubscenarioRunner, _read_permit_block
+        from src.utils.metrics import RunMetrics
+        from src.utils.scenario_definitions import load_combined_definition
+
+        r = SubscenarioRunner.__new__(SubscenarioRunner)
+        r.args = SimpleNamespace(permit_user=user, permit_split_seed=0, permit_settings={})
+        r.metrics = RunMetrics()
+        r.permit_profile = None
+        d = load_combined_definition(fx.PROJECT_ROOT, "permit", task)
+        r.permit_block = _read_permit_block(d.path)
+        ok = r._apply_permit_persona(d)
+        r.permission_mgr = PermissionManager(None, assistant_name=assistant, metrics=r.metrics)
+        if ok:
+            install_grants(r.permission_mgr, parse_grants({"grants": r.permit_block["grants"]}))
+            r._run_route_controller(r.permission_mgr.assistant.route_policy)
+        return r, d, ok
+
+    def test_persona_sets_truth_responder_and_wu_model(self):
+        tp = rp.trained(0)
+        user = rp.eligible_users(tp, self._block("t04_availability_to_alice"), rp.load_mapping(),
+                                 tp.split["test"])[0]
+        r, d, ok = self._runner(user)
+        self.assertTrue(ok)
+        answer = r.permit_block["persona"]["answers"]["list_week"]
+        self.assertEqual(r.permit_block["atoms"]["list_week"]["user_grants"], answer)
+        denied = [s["match"] for s in r.permit_block["atoms"].values() if not s["user_grants"]]
+        self.assertEqual(d.eval_config["out_of_alignment_calls"], denied)
+        sources = {dd.details.get("p_source") for dd in r.route_result.decisions}
+        self.assertTrue(any(str(s).startswith("wu:") for s in sources), sources)
+
+    def test_runner_refuses_non_test_participants(self):
+        tp = rp.trained(0)
+        _, _, ok = self._runner(tp.split["cal"][0])
+        self.assertFalse(ok)
+
+    def _block(self, task):
+        data, tasks = fx.load_fixtures()
+        return next(fx.compile_task(t, data)["permit"] for t in tasks if t.id == task)

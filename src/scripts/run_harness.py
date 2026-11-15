@@ -103,6 +103,7 @@ def _build_single_run_args(
         policy_file=base_args.policy_file,
         grants_file=base_args.grants_file,
         permit_settings=_permit_settings(base_args),
+        permit_split_seed=getattr(base_args, "permit_split_seed", 0),
         task_assistant_risk_tolerance=risk_tolerance,
         synthetic_responder=True,
         synthetic_responder_mode=synthetic_responder_mode,
@@ -154,11 +155,12 @@ def _expand_runs(args: argparse.Namespace) -> List[SimpleNamespace]:
             for subscenario in args.subscenarios:
                 if not _definition_exists(scenario, subscenario):
                     continue
+                users = _permit_users_for(args, scenario, subscenario)
                 for mode in responder_modes:
                     for risk_tolerance in assistant_risks:
-                        for _ in range(args.repetitions):
-                            runs.append(
-                                _build_single_run_args(
+                        for user in users:
+                            for _ in range(args.repetitions):
+                                run = _build_single_run_args(
                                     args,
                                     scenario=scenario,
                                     subscenario=subscenario,
@@ -167,8 +169,50 @@ def _expand_runs(args: argparse.Namespace) -> List[SimpleNamespace]:
                                     risk_tolerance=risk_tolerance,
                                     output_dir=output_dir,
                                 )
-                            )
+                                run.permit_user = user
+                                runs.append(run)
     return runs
+
+
+def _permit_users_for(args: argparse.Namespace, scenario: str, subscenario: str) -> List:
+    """Participants to replay for one PERMIT task: [None] means the fixture's own user.
+
+    --permit-users accepts 'test' (every eligible held-out participant), 'test:N'
+    (the first N eligible, sorted by id) or comma-separated participant ids.
+    Only test-split participants are allowed: train and calibration participants
+    shaped the predictor and its bound.
+    """
+    spec = (getattr(args, "permit_users", None) or "").strip()
+    if not spec or scenario != PERMIT_SCENARIO:
+        return [None]
+    import json as _json
+    from src.permit import replay as rp
+
+    tp = rp.trained(args.permit_split_seed)
+    path = Path(__file__).resolve().parents[2] / "scenarios" / "definitions" / f"scenario_{scenario}" / f"{subscenario}.json"
+    block = _json.loads(path.read_text())["permit"]
+    mapping = rp.load_mapping()
+    test = set(tp.split["test"])
+    eligible = rp.eligible_users(tp, block, mapping, list(test))
+    if spec == "test":
+        chosen = eligible
+    elif spec.startswith("test:"):
+        chosen = eligible[: int(spec.split(":", 1)[1])]
+    else:
+        ids = [u.strip() for u in spec.split(",") if u.strip()]
+        outside = [u for u in ids if u not in test]
+        if outside:
+            raise SystemExit(
+                f"--permit-users: {outside} are not test-split participants for split seed "
+                f"{args.permit_split_seed}; only held-out participants may be replayed."
+            )
+        chosen = [u for u in ids if u in eligible]
+        missing = sorted(set(ids) - set(chosen))
+        if missing:
+            print(f"{subscenario}: skipping {missing} (did not answer every mapped Wu item).")
+    if not chosen:
+        print(f"{subscenario}: no eligible participants; skipped.")
+    return chosen
 
 
 def parse_args() -> argparse.Namespace:
@@ -235,6 +279,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--permission-manager-verbose", action="store_true")
     parser.add_argument("--permission-assistant-verbose", action="store_true")
     parser.add_argument("--agent-verbose", action="store_true")
+    parser.add_argument("--permit-users", default=None,
+                        help="PERMIT: replay held-out Wu et al. participants as the user: 'test', "
+                             "'test:N' or comma-separated ids (default: the fixture's own user).")
+    parser.add_argument("--permit-split-seed", type=int, default=0,
+                        help="PERMIT: participant split seed for the predictor and --permit-users.")
     parser.add_argument("--permit-question-cost", type=float, default=0.1,
                         help="PERMIT route_eva: cost of one question, in route-quality units (default 0.1).")
     parser.add_argument("--permit-question-budget", type=int, default=None,

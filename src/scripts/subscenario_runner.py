@@ -24,6 +24,7 @@ from src.agent import create_agent
 from src.utils import usage_tracker
 from dataclasses import asdict
 from src.permit.fixtures import score_run
+from src.permit import replay as permit_replay
 from src.permit.routes import build_policy as build_route_policy, render_plan, run_controller, truth_answer
 from src.permit.grants import install_grants, load_grants, parse_grants
 from src.utils.model_config import make_model
@@ -211,6 +212,7 @@ class SubscenarioRunner:
         self._pending_abort: bool = False
         self.permit_block: Optional[dict] = None
         self.route_result = None
+        self.permit_profile: Optional[dict] = None
         self.permit_plan_text: str = ""
 
     async def run(self) -> int:
@@ -231,6 +233,8 @@ class SubscenarioRunner:
             return 1
 
         self.permit_block = _read_permit_block(combined_definition.path)
+        if not self._apply_permit_persona(combined_definition):
+            return 1
         if self.permit_block:
             installed = install_grants(
                 self.permission_mgr, parse_grants({"grants": self.permit_block["grants"]})
@@ -309,6 +313,7 @@ class SubscenarioRunner:
                 for r in self.tool_call_evaluator.records
             ]
             permit_score = score_run(self.permit_block, executed)
+            permit_score["permit_user"] = (self.permit_block.get("persona") or {}).get("user", "")
             if self.route_result is not None:
                 planned = self.route_result.route["id"] if self.route_result.route else ""
                 permit_score.update({
@@ -337,11 +342,43 @@ class SubscenarioRunner:
             self.metrics.write_csv(str(metrics_file))
         return 0
 
+    def _apply_permit_persona(self, combined_definition) -> bool:
+        """--permit-users: make a held-out Wu et al. participant the user of this task."""
+        permit_user = getattr(self.args, "permit_user", None)
+        if not permit_user:
+            return True
+        if not self.permit_block:
+            print("[red]--permit-users needs a PERMIT fixture (--scenarios permit).[/red]")
+            return False
+        self._permit_trained = permit_replay.trained(getattr(self.args, "permit_split_seed", 0))
+        if permit_user not in self._permit_trained.split["test"]:
+            print(f"[red]{permit_user} is not a held-out test participant.[/red]")
+            return False
+        self._permit_mapping = permit_replay.load_mapping()
+        made = permit_replay.persona(self._permit_trained, self.permit_block,
+                                     self._permit_mapping, permit_user)
+        if made is None:
+            print(f"[red]Participant {permit_user} cannot be replayed on this task.[/red]")
+            return False
+        self.permit_block, self.permit_profile = made
+        # Janus's alignment_aware responder refuses exactly this participant's "no" answers.
+        denied = [spec["match"] for spec in self.permit_block["atoms"].values()
+                  if not spec["user_grants"]]
+        combined_definition.eval_config["out_of_alignment_calls"] = denied
+        combined_definition.metadata["total_potential_out_of_alignment_tool_calls"] = len(denied)
+        run_logger.log("PERMIT persona: " + json.dumps(self.permit_block["persona"], sort_keys=True))
+        return True
+
     def _run_route_controller(self, policy_name: str) -> None:
         """PERMIT route layer: ask up front, grant yes-answers, plan the route."""
         block = self.permit_block
         settings = getattr(self.args, "permit_settings", None) or {}
-        result = run_controller(block, build_route_policy(policy_name, settings), truth_answer(block))
+        model = None
+        if getattr(self, "permit_profile", None) is not None:
+            model = permit_replay.WuPreferenceModel(self._permit_trained, self.permit_profile,
+                                                    self._permit_mapping)
+        result = run_controller(block, build_route_policy(policy_name, settings, model=model),
+                                truth_answer(block))
         run_logger.log("PERMIT policy settings: " + json.dumps(settings, sort_keys=True))
         for atom_id in result.questions:
             self.metrics.increment_permission_assistant()
