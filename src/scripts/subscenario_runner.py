@@ -39,7 +39,7 @@ from src.utils.tool_call_evaluator import (
     load_tool_call_evaluator_from_config,
     OutputCriterion,
 )
-from src.tools.data_store import set_active_data_set, set_inline_data_set
+from src.tools.data_store import reset_tool_state, set_active_data_set, set_inline_data_set
 from src.utils.scenario_definitions import load_combined_definition
 from src.utils import run_logger
 
@@ -235,6 +235,8 @@ class SubscenarioRunner:
         scenario_data_set = f"scenario_{self.args.scenario}/{self.args.subscenario}"
         set_active_data_set(scenario_data_set)
         set_inline_data_set(scenario_data_set, combined_definition.data)
+        # Fresh tool state per run (Janus otherwise leaks data between runs).
+        reset_tool_state()
         self.metrics.set_scenario_metadata(
             total_potential_desired_tool_calls=combined_definition.metadata.get(
                 "total_potential_desired_tool_calls"
