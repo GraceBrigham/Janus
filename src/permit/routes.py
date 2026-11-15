@@ -278,10 +278,22 @@ POLICIES: Dict[str, RoutePolicy] = {p.name: p for p in (NoAskPolicy(), AskAllPol
 PARAMETRISED = ("eva", "uncertainty")
 
 
-def build_policy(name: str, settings: Optional[Dict[str, Any]] = None) -> RoutePolicy:
-    """Build a route policy; ``settings`` may hold cost, budget, prior, margin, threshold."""
+class PriorOnlyModel(PreferenceModel):
+    """Same prior for every atom (ignores fixture hints); a non-personalised baseline."""
+
+    def __init__(self, prior: float = 0.5, margin: float = 0.1):
+        self.prior, self.margin = prior, margin
+
+    def estimate(self, block, atom_id):
+        return Estimate(self.prior, max(0.0, self.prior - self.margin), "prior")
+
+
+def build_policy(name: str, settings: Optional[Dict[str, Any]] = None,
+                 model: Optional[PreferenceModel] = None) -> RoutePolicy:
+    """Build a route policy; ``settings`` may hold cost, budget, prior, margin, threshold.
+    ``model`` overrides the preference model (default: fixture hint or prior)."""
     s = settings or {}
-    model = HintOrPriorModel(prior=float(s.get("prior", 0.5)), margin=float(s.get("margin", 0.1)))
+    model = model or HintOrPriorModel(prior=float(s.get("prior", 0.5)), margin=float(s.get("margin", 0.1)))
     if name == "eva":
         budget = s.get("budget")
         return EVAPolicy(cost=float(s.get("cost", 0.1)),
